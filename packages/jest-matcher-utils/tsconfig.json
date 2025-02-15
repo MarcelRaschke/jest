@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "lib": ["es2021", "dom"],
     "rootDir": "src",
     "outDir": "build"
   },
@@ -9,7 +10,6 @@
   "references": [
     {"path": "../jest-diff"},
     {"path": "../jest-get-type"},
-    {"path": "../pretty-format"},
-    {"path": "../test-utils"}
+    {"path": "../pretty-format"}
   ]
 }

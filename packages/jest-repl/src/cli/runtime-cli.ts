@@ -1,12 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import {cpus} from 'os';
+import {
+  // @ts-expect-error - added in Node 19.4.0
+  availableParallelism,
+  cpus,
+} from 'os';
 import * as path from 'path';
+import * as util from 'util';
 import chalk = require('chalk');
 import yargs = require('yargs');
 import {CustomConsole} from '@jest/console';
@@ -24,30 +29,31 @@ export async function run(
   cliArgv?: Config.Argv,
   cliInfo?: Array<string>,
 ): Promise<void> {
-  let argv;
+  let argv: Config.Argv;
   if (cliArgv) {
     argv = cliArgv;
   } else {
-    argv = <Config.Argv>(
-      yargs.usage(args.usage).help(false).version(false).options(args.options)
-        .argv
-    );
+    argv = yargs
+      .usage(args.usage)
+      .help(false)
+      .version(false)
+      .options(args.options).argv as Config.Argv;
 
     validateCLIOptions(argv, {...args.options, deprecationEntries});
   }
 
-  if (argv.help) {
+  if (argv.help === true) {
     yargs.showHelp();
     process.on('exit', () => (process.exitCode = 1));
     return;
   }
 
-  if (argv.version) {
+  if (argv.version === true) {
     console.log(`v${VERSION}\n`);
     return;
   }
 
-  if (!argv._.length) {
+  if (argv._.length === 0) {
     console.log('Please provide a path to a script. (See --help for details)');
     process.on('exit', () => (process.exitCode = 1));
     return;
@@ -56,7 +62,7 @@ export async function run(
   const root = tryRealpath(process.cwd());
   const filePath = path.resolve(root, argv._[0].toString());
 
-  if (argv.debug) {
+  if (argv.debug === true) {
     const info = cliInfo ? `, ${cliInfo.join(', ')}` : '';
     console.log(`Using Jest Runtime v${VERSION}${info}`);
   }
@@ -69,8 +75,13 @@ export async function run(
   };
 
   try {
+    const numCpus: number =
+      typeof availableParallelism === 'function'
+        ? availableParallelism()
+        : cpus().length;
+
     const hasteMap = await Runtime.createContext(projectConfig, {
-      maxWorkers: Math.max(cpus().length - 1, 1),
+      maxWorkers: Math.max(numCpus - 1, 1),
       watchman: globalConfig.watchman,
     });
 
@@ -102,11 +113,11 @@ export async function run(
         changedFiles: undefined,
         collectCoverage: false,
         collectCoverageFrom: [],
-        collectCoverageOnlyFrom: undefined,
         coverageProvider: 'v8',
         sourcesRelatedToTestsInChangedFiles: undefined,
       },
       filePath,
+      globalConfig,
     );
 
     for (const path of projectConfig.setupFiles) {
@@ -129,8 +140,12 @@ export async function run(
     } else {
       runtime.requireModule(filePath);
     }
-  } catch (e: any) {
-    console.error(chalk.red(e.stack || e));
-    process.on('exit', () => (process.exitCode = 1));
+  } catch (error: any) {
+    console.error(
+      chalk.red(util.types.isNativeError(error) ? error.stack : error),
+    );
+    process.on('exit', () => {
+      process.exitCode = 1;
+    });
   }
 }

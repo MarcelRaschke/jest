@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -9,7 +9,7 @@ import {execSync} from 'child_process';
 import fs from 'graceful-fs';
 import {isBinaryFileSync} from 'isbinaryfile';
 
-const getFileContents = path => fs.readFileSync(path, {encoding: 'utf-8'});
+const getFileContents = path => fs.readFileSync(path, 'utf8');
 const isDirectory = path => fs.lstatSync(path).isDirectory();
 const createRegExp = pattern => new RegExp(pattern);
 
@@ -118,7 +118,7 @@ const INCLUDED_PATTERNS = [
 ];
 
 const COPYRIGHT_LICENSE = [
-  ' * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.',
+  ' * Copyright (c) Meta Platforms, Inc. and affiliates.',
   ' *',
   ' * This source code is licensed under the MIT license found in the',
   ' * LICENSE file in the root directory of this source tree.',
@@ -130,7 +130,7 @@ function needsCopyrightHeader(file) {
 }
 
 function check() {
-  const allFiles = execSync('git ls-files', {encoding: 'utf-8'})
+  const allFiles = execSync('git ls-files', {encoding: 'utf8'})
     .trim()
     .split('\n');
 
@@ -144,7 +144,7 @@ function check() {
   );
 
   if (invalidFiles.length > 0) {
-    console.log(`Facebook copyright header check failed for the following files:
+    console.log(`Meta copyright header check failed for the following files:
 
   ${invalidFiles.join('\n  ')}
 

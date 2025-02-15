@@ -1,48 +1,55 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import * as path from 'path';
-import dedent = require('dedent');
-import {ExecaReturnValue, sync as spawnSync} from 'execa';
+import * as util from 'util';
+import dedentBase from 'dedent';
+import {
+  type ExecaSyncError,
+  type SyncOptions as ExecaSyncOptions,
+  type ExecaSyncReturnValue,
+  sync as spawnSync,
+} from 'execa';
 import * as fs from 'graceful-fs';
-import rimraf = require('rimraf');
-import type {PackageJson} from 'type-fest';
 import which = require('which');
 import type {Config} from '@jest/types';
 
-interface RunResult extends ExecaReturnValue {
-  status: number;
-  error: Error;
-}
+const dedent = dedentBase.withOptions({escapeSpecialCharacters: true});
+
 export const run = (
   cmd: string,
   cwd?: string,
   env?: Record<string, string>,
-): RunResult => {
+): ExecaSyncReturnValue => {
   const args = cmd.split(/\s/).slice(1);
-  const spawnOptions = {cwd, env, preferLocal: false, reject: false};
-  const result = spawnSync(cmd.split(/\s/)[0], args, spawnOptions) as RunResult;
+  const spawnOptions: ExecaSyncOptions = {
+    cwd,
+    env,
+    preferLocal: false,
+    reject: false,
+  };
+  const result = spawnSync(cmd.split(/\s/)[0], args, spawnOptions);
 
-  // For compat with cross-spawn
-  result.status = result.exitCode;
+  if (result.exitCode !== 0) {
+    const errorResult = result as ExecaSyncError;
 
-  if (result.status !== 0) {
-    const message = `
-      ORIGINAL CMD: ${cmd}
-      STDOUT: ${result.stdout}
-      STDERR: ${result.stderr}
-      STATUS: ${result.status}
-      ERROR: ${result.error}
-    `;
-    throw new Error(message);
+    // have to extract message for the `util.inspect` to be useful for some reason
+    const {message, ...rest} = errorResult;
+
+    errorResult.message += `\n\n${util.inspect(rest)}`;
+
+    throw errorResult;
   }
 
   return result;
 };
+
+const yarnInstallImmutable = 'yarn install --immutable';
+const yarnInstallNoImmutable = 'yarn install --no-immutable';
 
 export const runYarnInstall = (cwd: string, env?: Record<string, string>) => {
   const lockfilePath = path.resolve(cwd, 'yarn.lock');
@@ -54,7 +61,26 @@ export const runYarnInstall = (cwd: string, env?: Record<string, string>) => {
     fs.writeFileSync(lockfilePath, '');
   }
 
-  return run(exists ? 'yarn install --immutable' : 'yarn install', cwd, env);
+  try {
+    return run(
+      exists ? yarnInstallImmutable : yarnInstallNoImmutable,
+      cwd,
+      env,
+    );
+  } catch (error) {
+    try {
+      // retry once in case of e.g. permission errors
+      return run(
+        fs.readFileSync(lockfilePath, 'utf8').trim().length > 0
+          ? yarnInstallImmutable
+          : yarnInstallNoImmutable,
+        cwd,
+        env,
+      );
+    } catch {
+      throw error;
+    }
+  }
 };
 
 export const linkJestPackage = (packageName: string, cwd: string) => {
@@ -62,21 +88,32 @@ export const linkJestPackage = (packageName: string, cwd: string) => {
   const packagePath = path.resolve(packagesDir, packageName);
   const destination = path.resolve(cwd, 'node_modules/', packageName);
   fs.mkdirSync(destination, {recursive: true});
-  rimraf.sync(destination);
+  fs.rmSync(destination, {force: true, recursive: true});
   fs.symlinkSync(packagePath, destination, 'junction');
 };
 
 export const makeTemplate =
-  (str: string): ((values?: Array<unknown>) => string) =>
+  (str: string): ((values?: Array<string>) => string) =>
   (values = []) =>
-    str.replace(/\$(\d+)/g, (_match, number) => {
+    str.replaceAll(/\$(\d+)/g, (_match, number) => {
       if (!Array.isArray(values)) {
-        throw new Error('Array of values must be passed to the template.');
+        throw new TypeError('Array of values must be passed to the template.');
       }
       return values[number - 1];
     });
 
-export const cleanup = (directory: string) => rimraf.sync(directory);
+export const cleanup = (directory: string) => {
+  try {
+    fs.rmSync(directory, {force: true, recursive: true});
+  } catch (error) {
+    try {
+      // retry once in case of e.g. permission errors
+      fs.rmSync(directory, {force: true, recursive: true});
+    } catch {
+      throw error;
+    }
+  }
+};
 
 /**
  * Creates a nested directory with files and their contents
@@ -93,7 +130,7 @@ export const writeFiles = (
   files: {[filename: string]: string},
 ) => {
   fs.mkdirSync(directory, {recursive: true});
-  Object.keys(files).forEach(fileOrPath => {
+  for (const fileOrPath of Object.keys(files)) {
     const dirname = path.dirname(fileOrPath);
 
     if (dirname !== '/') {
@@ -103,7 +140,7 @@ export const writeFiles = (
       path.resolve(directory, ...fileOrPath.split('/')),
       dedent(files[fileOrPath]),
     );
-  });
+  }
 };
 
 export const writeSymlinks = (
@@ -111,7 +148,7 @@ export const writeSymlinks = (
   symlinks: {[existingFile: string]: string},
 ) => {
   fs.mkdirSync(directory, {recursive: true});
-  Object.keys(symlinks).forEach(fileOrPath => {
+  for (const fileOrPath of Object.keys(symlinks)) {
     const symLinkPath = symlinks[fileOrPath];
     const dirname = path.dirname(symLinkPath);
 
@@ -123,7 +160,7 @@ export const writeSymlinks = (
       path.resolve(directory, ...symLinkPath.split('/')),
       'junction',
     );
-  });
+  }
 };
 
 const NUMBER_OF_TESTS_TO_FORCE_USING_WORKERS = 25;
@@ -155,10 +192,13 @@ export const copyDir = (src: string, dest: string) => {
   }
 };
 
+export const replaceSeed = (str: string) =>
+  str.replaceAll(/Seed: {8}(-?\d+)/g, 'Seed:       <<REPLACED>>');
+
 export const replaceTime = (str: string) =>
   str
-    .replace(/\d*\.?\d+ m?s\b/g, '<<REPLACED>>')
-    .replace(/, estimated <<REPLACED>>/g, '');
+    .replaceAll(/\d*\.?\d+ m?s\b/g, '<<REPLACED>>')
+    .replaceAll(', estimated <<REPLACED>>', '');
 
 // Since Jest does not guarantee the order of tests we'll sort the output.
 export const sortLines = (output: string) =>
@@ -168,11 +208,13 @@ export const sortLines = (output: string) =>
     .map(str => str.trim())
     .join('\n');
 
-interface JestPackageJson extends PackageJson {
-  jest: Config.InitialOptions;
+export interface PackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  jest?: Config.InitialOptions;
 }
 
-const DEFAULT_PACKAGE_JSON: JestPackageJson = {
+const DEFAULT_PACKAGE_JSON: PackageJson = {
   jest: {
     testEnvironment: 'node',
   },
@@ -195,18 +237,16 @@ export const createEmptyPackage = (
 
 export const extractSummary = (stdout: string) => {
   const match = stdout
-    .replace(/(?:\\[rn])+/g, '\n')
+    .replaceAll(/(?:\\[nr])+/g, '\n')
     .match(
-      /Test Suites:.*\nTests.*\nSnapshots.*\nTime.*(\nRan all test suites)*.*\n*$/gm,
+      /(Seed:.*\n)?Test Suites:.*\nTests.*\nSnapshots.*\nTime.*(\nRan all test suites)*.*\n*$/gm,
     );
   if (!match) {
-    throw new Error(
-      `
+    throw new Error(dedent`
       Could not find test summary in the output.
       OUTPUT:
         ${stdout}
-    `,
-    );
+    `);
   }
 
   const summary = replaceTime(match[0]);
@@ -214,7 +254,7 @@ export const extractSummary = (stdout: string) => {
   const rest = stdout
     .replace(match[0], '')
     // remove all timestamps
-    .replace(/\s*\(\d*\.?\d+ m?s\b\)$/gm, '');
+    .replaceAll(/\s*\(\d*\.?\d+ m?s\b\)$/gm, '');
 
   return {
     rest: rest.trim(),
@@ -229,13 +269,13 @@ const sortTests = (stdout: string) =>
       if (['RUNS', 'PASS', 'FAIL'].includes(line.slice(0, 4))) {
         tests.push([line]);
       } else {
-        tests[tests.length - 1].push(line);
+        tests.at(-1)!.push(line);
       }
       return tests;
     }, [])
     .sort(([a], [b]) => (a > b ? 1 : -1))
     .map(strings =>
-      strings.length > 1 ? `${strings.join('\n').trimRight()}\n` : strings[0],
+      strings.length > 1 ? `${strings.join('\n').trimEnd()}\n` : strings[0],
     )
     .join('\n')
     .trim();
@@ -252,7 +292,7 @@ export const extractSummaries = (
   stdout: string,
 ): Array<{rest: string; summary: string}> => {
   const regex =
-    /Test Suites:.*\nTests.*\nSnapshots.*\nTime.*(\nRan all test suites)*.*\n*$/gm;
+    /(Seed:.*\n)?Test Suites:.*\nTests.*\nSnapshots.*\nTime.*(\nRan all test suites)*.*\n*$/gm;
 
   let match = regex.exec(stdout);
   const matches: Array<RegExpExecArray> = [];
@@ -272,17 +312,6 @@ export const extractSummaries = (
     .map(({start, end}) => extractSortedSummary(stdout.slice(start, end)));
 };
 
-export const normalizeIcons = (str: string) => {
-  if (!str) {
-    return str;
-  }
-
-  // Make sure to keep in sync with `jest-cli/src/constants`
-  return str
-    .replace(new RegExp('\u00D7', 'g'), '\u2715')
-    .replace(new RegExp('\u221A', 'g'), '\u2713');
-};
-
 // Certain environments (like CITGM and GH Actions) do not come with mercurial installed
 let hgIsInstalled: boolean | null = null;
 
@@ -295,6 +324,39 @@ export const testIfHg = (...args: Parameters<typeof test>) => {
     test(...args);
   } else {
     console.warn('Mercurial (hg) is not installed - skipping some tests');
+    test.skip(...args);
+  }
+};
+
+// Certain environments (like CITGM and GH Actions) do not come with sapling installed
+let slIsInstalled: boolean | null = null;
+export const testIfSl = (...args: Parameters<typeof test>) => {
+  if (slIsInstalled === null) {
+    slIsInstalled = which.sync('sl', {nothrow: true}) !== null;
+  }
+
+  if (slIsInstalled) {
+    test(...args);
+  } else {
+    console.warn('Sapling (sl) is not installed - skipping some tests');
+    test.skip(...args);
+  }
+};
+
+export const testIfSlAndHg = (...args: Parameters<typeof test>) => {
+  if (slIsInstalled === null) {
+    slIsInstalled = which.sync('sl', {nothrow: true}) !== null;
+  }
+  if (hgIsInstalled === null) {
+    hgIsInstalled = which.sync('hg', {nothrow: true}) !== null;
+  }
+
+  if (slIsInstalled && hgIsInstalled) {
+    test(...args);
+  } else {
+    console.warn(
+      'Sapling (sl) or Mercurial (hg) is not installed - skipping some tests',
+    );
     test.skip(...args);
   }
 };

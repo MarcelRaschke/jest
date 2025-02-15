@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -12,16 +12,13 @@
 
 import co from 'co';
 import isGeneratorFn from 'is-generator-fn';
-import throat from 'throat';
+import pLimit = require('p-limit');
 import type {Config, Global} from '@jest/types';
+import {isPromise} from 'jest-util';
 import isError from './isError';
 import type Spec from './jasmine/Spec';
 import type {DoneFn, QueueableFn} from './queueRunner';
 import type {Jasmine} from './types';
-
-function isPromise(obj: any): obj is PromiseLike<unknown> {
-  return obj && typeof obj.then === 'function';
-}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const doneFnNoop = () => {};
@@ -66,14 +63,15 @@ function promisifyLifeCycleFunction(
       return originalFn.call(env, asyncJestLifecycleWithCallback, timeout);
     }
 
+    // eslint-disable-next-line unicorn/error-message
     const extraError = new Error();
 
     // Without this line v8 stores references to all closures
     // in the stack in the Error object. This line stringifies the stack
     // property to allow garbage-collecting objects on the stack
     // https://crbug.com/v8/7142
-    // eslint-disable-next-line no-self-assign
-    extraError.stack = extraError.stack;
+    const originalExtraErrorStack = extraError.stack;
+    extraError.stack = originalExtraErrorStack;
 
     // We make *all* functions async and run `done` right away if they
     // didn't return a promise.
@@ -87,6 +85,9 @@ function promisifyLifeCycleFunction(
 
           if (message) {
             extraError.message = message;
+            extraError.stack =
+              originalExtraErrorStack &&
+              originalExtraErrorStack.replace('Error: ', `Error: ${message}`);
           }
           done.fail(checkIsError ? error : extraError);
         });
@@ -142,14 +143,15 @@ function promisifyIt(
       return originalFn.call(env, specName, asyncJestTestWithCallback, timeout);
     }
 
+    // eslint-disable-next-line unicorn/error-message
     const extraError = new Error();
 
     // Without this line v8 stores references to all closures
     // in the stack in the Error object. This line stringifies the stack
     // property to allow garbage-collecting objects on the stack
     // https://crbug.com/v8/7142
-    // eslint-disable-next-line no-self-assign
-    extraError.stack = extraError.stack;
+    const originalExtraErrorStack = extraError.stack;
+    extraError.stack = originalExtraErrorStack;
 
     const asyncJestTest = function (done: DoneFn) {
       const wrappedFn = isGeneratorFn(fn) ? co.wrap(fn) : fn;
@@ -161,6 +163,9 @@ function promisifyIt(
 
           if (message) {
             extraError.message = message;
+            extraError.stack =
+              originalExtraErrorStack &&
+              originalExtraErrorStack.replace('Error: ', `Error: ${message}`);
           }
 
           if (jasmine.Spec.isPendingSpecException(error)) {
@@ -192,7 +197,7 @@ function makeConcurrent(
     timeout?: number,
   ) => Spec,
   env: Jasmine['currentEnv_'],
-  mutex: ReturnType<typeof throat>,
+  mutex: ReturnType<typeof pLimit>,
 ): Global.ItConcurrentBase {
   const concurrentFn = function (
     specName: Global.TestNameLike,
@@ -226,14 +231,24 @@ function makeConcurrent(
 
     return spec;
   };
-  // each is bound after the function is made concurrent, so for now it is made noop
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  concurrentFn.each = () => () => {};
-  concurrentFn.failing = () => () => {
+
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const failing = () => {
     throw new Error(
       'Jest: `failing` tests are only supported in `jest-circus`.',
     );
   };
+
+  failing.each = () => {
+    throw new Error(
+      'Jest: `failing` tests are only supported in `jest-circus`.',
+    );
+  };
+  // each is bound after the function is made concurrent, so for now it is made noop
+  // eslint-disable-next-line @typescript-eslint/no-empty-function,unicorn/consistent-function-scoping
+  concurrentFn.each = () => () => {};
+  concurrentFn.failing = failing;
+
   return concurrentFn;
 }
 
@@ -242,7 +257,7 @@ export default function jasmineAsyncInstall(
   global: Global.Global,
 ): void {
   const jasmine = global.jasmine;
-  const mutex = throat(globalConfig.maxConcurrency);
+  const mutex = pLimit(globalConfig.maxConcurrency);
 
   const env = jasmine.getEnv();
   env.it = promisifyIt(env.it, env, jasmine);

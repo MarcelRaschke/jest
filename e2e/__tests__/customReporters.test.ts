@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,6 @@
 
 import {tmpdir} from 'os';
 import * as path from 'path';
-import {onNodeVersions} from '@jest/test-utils';
 import {cleanup, extractSummary, writeFiles} from '../Utils';
 import runJest from '../runJest';
 
@@ -50,7 +49,7 @@ describe('Custom Reporters Integration', () => {
 
   test('invalid format for adding reporters', () => {
     const reporterConfig = {
-      reporters: [[3243242]],
+      reporters: [[3_243_242]],
     };
 
     const {exitCode, stderr} = runJest('custom-reporters', [
@@ -159,27 +158,25 @@ describe('Custom Reporters Integration', () => {
     expect(exitCode).toBe(1);
   });
 
-  onNodeVersions('>=12.17.0', () => {
-    test('supports reporter written in ESM', () => {
-      writeFiles(DIR, {
-        '__tests__/test.test.js': "test('test', () => {});",
-        'package.json': JSON.stringify({
-          jest: {
-            reporters: ['default', '<rootDir>/reporter.mjs'],
-          },
-        }),
-        'reporter.mjs': `
+  test('supports reporter written in ESM', () => {
+    writeFiles(DIR, {
+      '__tests__/test.test.js': "test('test', () => {});",
+      'package.json': JSON.stringify({
+        jest: {
+          reporters: ['default', '<rootDir>/reporter.mjs'],
+        },
+      }),
+      'reporter.mjs': `
         export default class Reporter {
           onRunStart() {
             throw new Error('ON_RUN_START_ERROR');
           }
         };
       `,
-      });
-
-      const {stderr, exitCode} = runJest(DIR);
-      expect(stderr).toMatch(/ON_RUN_START_ERROR/);
-      expect(exitCode).toBe(1);
     });
+
+    const {stderr, exitCode} = runJest(DIR);
+    expect(stderr).toMatch(/ON_RUN_START_ERROR/);
+    expect(exitCode).toBe(1);
   });
 });

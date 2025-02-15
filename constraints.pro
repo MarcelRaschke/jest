@@ -17,15 +17,9 @@ gen_enforced_dependency(WorkspaceCwd, DependencyIdent, DependencyRange2, Depende
   % Ignore peer dependencies
   DependencyType \= 'peerDependencies',
   DependencyType2 \= 'peerDependencies',
-  % Ignore workspace:*: we use both `workspace:*` and real version such as `^28.0.0-alpha.8` to reference package in monorepo
-  % TODO: in the future we should make it consistent and remove this ignore
-  DependencyRange \= 'workspace:*',
-  DependencyRange2 \= 'workspace:*',
   % A list of exception to same version rule
   \+ member(DependencyIdent, [
-    % Allow enzyme example workspace use a older version react and react-dom, because enzyme don't support react 17
-    'react', 'react-dom',
-    % @types/node in the root need to stay on ~12.12.0
+    % @types/node in the root need to stay on ~14.14.45
     '@types/node',
     % upgrading the entire repository is a breaking change
     'glob'
@@ -45,7 +39,7 @@ gen_enforced_field(WorkspaceCwd, 'license', null) :-
 % Enforces the repository field for all public workspaces while removing it from private workspaces
 gen_enforced_field(WorkspaceCwd, 'repository.type', 'git') :-
   \+ workspace_field(WorkspaceCwd, 'private', true).
-gen_enforced_field(WorkspaceCwd, 'repository.url', 'https://github.com/facebook/jest.git') :-
+gen_enforced_field(WorkspaceCwd, 'repository.url', 'https://github.com/jestjs/jest.git') :-
   \+ workspace_field(WorkspaceCwd, 'private', true).
 gen_enforced_field(WorkspaceCwd, 'repository.directory', WorkspaceCwd) :-
   \+ workspace_field(WorkspaceCwd, 'private', true).
@@ -59,7 +53,7 @@ gen_enforced_field(WorkspaceCwd, 'publishConfig.access', null) :-
   workspace_field(WorkspaceCwd, 'private', true).
 
 % Enforces the engines.node field for public workspace
-gen_enforced_field(WorkspaceCwd, 'engines.node', '^12.13.0 || ^14.15.0 || ^16.10.0 || >=17.0.0') :-
+gen_enforced_field(WorkspaceCwd, 'engines.node', '^16.10.0 || ^18.12.0 || >=20.0.0') :-
   \+ workspace_field(WorkspaceCwd, 'private', true).
 
 % Enforces the main and types field to start with ./

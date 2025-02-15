@@ -1,16 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
+import {TestPathPatterns} from '@jest/pattern';
 import {makeGlobalConfig} from '@jest/test-utils';
 import type {Config} from '@jest/types';
 import getNoTestsFoundMessage from '../getNoTestsFoundMessage';
 
 jest.mock('jest-util', () => ({
-  ...jest.requireActual('jest-util'),
+  ...jest.requireActual<typeof import('jest-util')>('jest-util'),
   isInteractive: true,
 }));
 
@@ -18,7 +19,7 @@ describe('getNoTestsFoundMessage', () => {
   function createGlobalConfig(options?: Partial<Config.GlobalConfig>) {
     return makeGlobalConfig({
       rootDir: '/root/dir',
-      testPathPattern: '/path/pattern',
+      testPathPatterns: new TestPathPatterns(['/path/pattern']),
       ...options,
     });
   }

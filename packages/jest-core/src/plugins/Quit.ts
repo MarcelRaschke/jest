@@ -1,16 +1,17 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import {BaseWatchPlugin, UsageData} from 'jest-watcher';
+import type {ReadStream, WriteStream} from 'tty';
+import {BaseWatchPlugin, type UsageData} from 'jest-watcher';
 
 class QuitPlugin extends BaseWatchPlugin {
   isInternal: true;
 
-  constructor(options: {stdin: NodeJS.ReadStream; stdout: NodeJS.WriteStream}) {
+  constructor(options: {stdin: ReadStream; stdout: WriteStream}) {
     super(options);
     this.isInternal = true;
   }

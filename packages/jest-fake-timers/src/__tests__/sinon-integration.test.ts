@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -9,7 +9,7 @@
 import {makeProjectConfig} from '@jest/test-utils';
 import FakeTimers from '../modernFakeTimers';
 
-jest.spyOn(Date, 'now').mockImplementation(() => 123456);
+jest.spyOn(Date, 'now').mockImplementation(() => 123_456);
 
 const mockInstall = jest.fn();
 
@@ -17,6 +17,7 @@ const mockWithGlobal = {
   install: mockInstall,
   timers: {
     Date: jest.fn(),
+    cancelAnimationFrame: jest.fn(),
     clearImmediate: jest.fn(),
     clearInterval: jest.fn(),
     clearTimeout: jest.fn(),
@@ -24,6 +25,7 @@ const mockWithGlobal = {
     nextTick: jest.fn(),
     performance: jest.fn(),
     queueMicrotask: jest.fn(),
+    requestAnimationFrame: jest.fn(),
     setImmediate: jest.fn(),
     setInterval: jest.fn(),
     setTimeout: jest.fn(),
@@ -49,14 +51,15 @@ describe('`@sinonjs/fake-timers` integration', () => {
 
     timers.useFakeTimers();
 
-    expect(mockInstall).toBeCalledWith({
+    expect(mockInstall).toHaveBeenCalledWith({
       advanceTimeDelta: undefined,
       loopLimit: 100_000,
-      now: 123456,
+      now: 123_456,
       shouldAdvanceTime: false,
       shouldClearNativeTimers: true,
       toFake: [
         'Date',
+        'cancelAnimationFrame',
         'clearImmediate',
         'clearInterval',
         'clearTimeout',
@@ -64,6 +67,7 @@ describe('`@sinonjs/fake-timers` integration', () => {
         'nextTick',
         'performance',
         'queueMicrotask',
+        'requestAnimationFrame',
         'setImmediate',
         'setInterval',
         'setTimeout',
@@ -86,19 +90,21 @@ describe('`@sinonjs/fake-timers` integration', () => {
 
     timers.useFakeTimers();
 
-    expect(mockInstall).toBeCalledWith({
+    expect(mockInstall).toHaveBeenCalledWith({
       advanceTimeDelta: undefined,
       loopLimit: 100,
       now: 0,
       shouldAdvanceTime: true,
       shouldClearNativeTimers: true,
       toFake: [
+        'cancelAnimationFrame',
         'clearImmediate',
         'clearInterval',
         'clearTimeout',
         'hrtime',
         'performance',
         'queueMicrotask',
+        'requestAnimationFrame',
         'setImmediate',
         'setInterval',
         'setTimeout',
@@ -119,19 +125,21 @@ describe('`@sinonjs/fake-timers` integration', () => {
       timerLimit: 2000,
     });
 
-    expect(mockInstall).toBeCalledWith({
+    expect(mockInstall).toHaveBeenCalledWith({
       advanceTimeDelta: 40,
       loopLimit: 2000,
       now: new Date('1995-12-17'),
       shouldAdvanceTime: true,
       shouldClearNativeTimers: true,
       toFake: [
+        'cancelAnimationFrame',
         'clearImmediate',
         'clearInterval',
         'clearTimeout',
         'hrtime',
         'nextTick',
         'performance',
+        'requestAnimationFrame',
         'setImmediate',
         'setInterval',
         'setTimeout',
@@ -155,23 +163,25 @@ describe('`@sinonjs/fake-timers` integration', () => {
     timers.useFakeTimers({
       advanceTimers: false,
       doNotFake: ['hrtime'],
-      now: 123456,
+      now: 123_456,
     });
 
-    expect(mockInstall).toBeCalledWith({
+    expect(mockInstall).toHaveBeenCalledWith({
       advanceTimeDelta: undefined,
       loopLimit: 1000,
-      now: 123456,
+      now: 123_456,
       shouldAdvanceTime: false,
       shouldClearNativeTimers: true,
       toFake: [
         'Date',
+        'cancelAnimationFrame',
         'clearImmediate',
         'clearInterval',
         'clearTimeout',
         'nextTick',
         'performance',
         'queueMicrotask',
+        'requestAnimationFrame',
         'setImmediate',
         'setInterval',
         'setTimeout',

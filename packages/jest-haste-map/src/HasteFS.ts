@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -8,9 +8,9 @@
 import {globsToMatcher, replacePathSepForGlob} from 'jest-util';
 import H from './constants';
 import * as fastPath from './lib/fast_path';
-import type {FileData} from './types';
+import type {FileData, IHasteFS} from './types';
 
-export default class HasteFS {
+export default class HasteFS implements IHasteFS {
   private readonly _rootDir: string;
   private readonly _files: FileData;
 
@@ -51,7 +51,7 @@ export default class HasteFS {
   }
 
   getAllFiles(): Array<string> {
-    return Array.from(this.getAbsoluteFileIterator());
+    return [...this.getAbsoluteFileIterator()];
   }
 
   getFileIterator(): Iterable<string> {

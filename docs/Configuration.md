@@ -5,7 +5,7 @@ title: Configuring Jest
 
 The Jest philosophy is to work great by default, but sometimes you just need more configuration power.
 
-It is recommended to define the configuration in a dedicated JavaScript, TypeScript or JSON file. The file will be discovered automatically, if it is named `jest.config.js|ts|mjs|cjs|json`. You can use [`--config`](CLI.md#--configpath) flag to pass an explicit path to the file.
+It is recommended to define the configuration in a dedicated JavaScript, TypeScript or JSON file. The file will be discovered automatically, if it is named `jest.config.js|ts|mjs|cjs|cts|json`. You can use [`--config`](CLI.md#--configpath) flag to pass an explicit path to the file.
 
 :::note
 
@@ -57,7 +57,36 @@ export default async (): Promise<Config> => {
 
 :::tip
 
-To read TypeScript configuration files Jest requires [`ts-node`](https://npmjs.com/package/ts-node). Make sure it is installed in your project.
+To read TypeScript configuration files Jest by default requires [`ts-node`](https://npmjs.com/package/ts-node). You can override this behavior by adding a `@jest-config-loader` docblock at the top of the file. Currently, [`ts-node`](https://npmjs.com/package/ts-node) and [`esbuild-register`](https://npmjs.com/package/esbuild-register) is supported. Make sure `ts-node` or the loader you specify is installed.
+
+```ts title="jest.config.ts"
+/** @jest-config-loader ts-node */
+// or
+/** @jest-config-loader esbuild-register */
+
+import type {Config} from 'jest';
+
+const config: Config = {
+  verbose: true,
+};
+
+export default config;
+```
+
+You can also pass options to the loader, for instance to enable `transpileOnly`.
+
+```ts title="jest.config.ts"
+/** @jest-config-loader ts-node */
+/** @jest-config-loader-options {"transpileOnly": true} */
+
+import type {Config} from 'jest';
+
+const config: Config = {
+  verbose: true,
+};
+
+export default config;
+```
 
 :::
 
@@ -81,6 +110,15 @@ Alternatively Jest's configuration can be defined through the `"jest"` key in th
 }
 ```
 
+Also Jest's configuration json file can be referenced through the `"jest"` key in the `package.json` of your project:
+
+```json title="package.json"
+{
+  "name": "my-project",
+  "jest": "./path/to/config.json"
+}
+```
+
 ## Options
 
 :::info
@@ -92,7 +130,7 @@ const {defaults} = require('jest-config');
 
 /** @type {import('jest').Config} */
 const config = {
-  moduleFileExtensions: [...defaults.moduleFileExtensions, 'mts', 'cts'],
+  moduleDirectories: [...defaults.moduleDirectories, 'bower_components'],
 };
 
 module.exports = config;
@@ -103,7 +141,7 @@ import type {Config} from 'jest';
 import {defaults} from 'jest-config';
 
 const config: Config = {
-  moduleFileExtensions: [...defaults.moduleFileExtensions, 'mts'],
+  moduleDirectories: [...defaults.moduleDirectories, 'bower_components'],
 };
 
 export default config;
@@ -243,7 +281,8 @@ This option requires `collectCoverage` to be set to `true` or Jest to be invoked
 
 <details>
   <summary>Help:</summary>
-  If you are seeing coverage output such as...
+
+If you are seeing coverage output such as...
 
 ```
 =============================== Coverage summary ===============================
@@ -276,8 +315,6 @@ These pattern strings match against the full path. Use the `<rootDir>` string to
 ### `coverageProvider` \[string]
 
 Indicates which provider should be used to instrument code for coverage. Allowed values are `babel` (default) or `v8`.
-
-Note that using `v8` is considered experimental. This uses V8's builtin code coverage rather than one based on Babel. It is not as well tested, and it has also improved in the last few releases of Node. Using the latest versions of node (v14 at the time of this writing) will yield better results.
 
 ### `coverageReporters` \[array&lt;string | \[string, options]&gt;]
 
@@ -312,7 +349,7 @@ const config: Config = {
 export default config;
 ```
 
-For more information about the options object shape refer to `CoverageReporterWithOptions` type in the [type definitions](https://github.com/facebook/jest/tree/main/packages/jest-types/src/Config.ts).
+For more information about the options object shape refer to `CoverageReporterWithOptions` type in the [type definitions](https://github.com/jestjs/jest/tree/main/packages/jest-types/src/Config.ts).
 
 ### `coverageThreshold` \[object]
 
@@ -654,7 +691,7 @@ type ModernFakeTimersConfig = {
    * The default is `false`.
    */
   legacyFakeTimers?: boolean;
-  /** Sets current system time to be used by fake timers. The default is `Date.now()`. */
+  /** Sets current system time to be used by fake timers, in milliseconds. The default is `Date.now()`. */
   now?: number;
   /** Maximum number of recursive timers that will be run. The default is `100_000` timers. */
   timerLimit?: number;
@@ -764,13 +801,17 @@ const config: Config = {
 export default config;
 ```
 
-Note that, if you specify a global reference value (like an object or array) here, and some code mutates that value in the midst of running a test, that mutation will _not_ be persisted across test runs for other test files. In addition, the `globals` object must be json-serializable, so it can't be used to specify global functions. For that, you should use `setupFiles`.
+:::note
+
+If you specify a global reference value (like an object or array) here, and some code mutates that value in the midst of running a test, that mutation will _not_ be persisted across test runs for other test files. In addition, the `globals` object must be json-serializable, so it can't be used to specify global functions. For that, you should use `setupFiles`.
+
+:::
 
 ### `globalSetup` \[string]
 
 Default: `undefined`
 
-This option allows the use of a custom global setup module, which must export a function (it can be sync or async). The function will be triggered once before all test suites and it will receive two arguments: Jest's [`globalConfig`](https://github.com/facebook/jest/blob/main/packages/jest-types/src/Config.ts#L282) and [`projectConfig`](https://github.com/facebook/jest/blob/main/packages/jest-types/src/Config.ts#L347).
+This option allows the use of a custom global setup module, which must export a function (it can be sync or async). The function will be triggered once before all test suites and it will receive two arguments: Jest's [`globalConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L358-L422) and [`projectConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L424-L481).
 
 :::info
 
@@ -784,7 +825,7 @@ While code transformation is applied to the linked setup-file, Jest will **not**
 
 ```js title="setup.js"
 module.exports = async function (globalConfig, projectConfig) {
-  console.log(globalConfig.testPathPattern);
+  console.log(globalConfig.testPathPatterns);
   console.log(projectConfig.cache);
 
   // Set reference to mongod in order to close the server during teardown.
@@ -794,7 +835,7 @@ module.exports = async function (globalConfig, projectConfig) {
 
 ```js title="teardown.js"
 module.exports = async function (globalConfig, projectConfig) {
-  console.log(globalConfig.testPathPattern);
+  console.log(globalConfig.testPathPatterns);
   console.log(projectConfig.cache);
 
   await globalThis.__MONGOD__.stop();
@@ -805,7 +846,7 @@ module.exports = async function (globalConfig, projectConfig) {
 
 Default: `undefined`
 
-This option allows the use of a custom global teardown module which must export a function (it can be sync or async). The function will be triggered once after all test suites and it will receive two arguments: Jest's [`globalConfig`](https://github.com/facebook/jest/blob/main/packages/jest-types/src/Config.ts#L282) and [`projectConfig`](https://github.com/facebook/jest/blob/main/packages/jest-types/src/Config.ts#L347).
+This option allows the use of a custom global teardown module which must export a function (it can be sync or async). The function will be triggered once after all test suites and it will receive two arguments: Jest's [`globalConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L358-L422) and [`projectConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L424-L481).
 
 :::info
 
@@ -839,7 +880,7 @@ type HasteConfig = {
   hasteImplModulePath?: string;
   /** All platforms to target, e.g ['ios', 'android']. */
   platforms?: Array<string>;
-  /** Whether to throw on error on module collision. */
+  /** Whether to throw an error on module collision. */
   throwOnModuleCollision?: boolean;
   /** Custom HasteMap module */
   hasteMapModulePath?: string;
@@ -926,9 +967,15 @@ const config: Config = {
 export default config;
 ```
 
+:::caution
+
+It is discouraged to use `'.'` as one of the `moduleDirectories`, because this prevents scoped packages such as `@emotion/react` from accessing packages with the same subdirectory name (`react`). See [this issue](https://github.com/jestjs/jest/issues/10498) for more details. In most cases, it is preferable to use the [moduleNameMapper](#modulenamemapper-objectstring-string--arraystring) configuration instead.
+
+:::
+
 ### `moduleFileExtensions` \[array&lt;string&gt;]
 
-Default: `["js", "mjs", "cjs", "jsx", "ts", "tsx", "json", "node"]`
+Default: `["js", "mjs", "cjs", "jsx", "ts", "mts", "cts", "tsx", "json", "node"]`
 
 An array of file extensions your modules use. If you require modules without specifying a file extension, these are the extensions Jest will look for, in left-to-right order.
 
@@ -1076,6 +1123,12 @@ Specifies notification mode. Requires `notify: true`.
 - `success-change`: send a notification when tests pass or once when it fails.
 - `failure-change`: send a notification when tests fail or once when it passes.
 
+### `openHandlesTimeout` \[number]
+
+Default: `1000`
+
+Print a warning indicating that there are probable open handles if Jest does not exit cleanly this number of milliseconds after it completes. Use `0` to disable the warning.
+
 ### `preset` \[string]
 
 Default: `undefined`
@@ -1126,7 +1179,7 @@ export default config;
 
 :::info
 
-Note that if you also have specified [`rootDir`](#rootdir-string) that the resolution of this file will be relative to that root directory.
+If you also have specified [`rootDir`](#rootdir-string), the resolution of this file will be relative to that root directory.
 
 :::
 
@@ -1208,6 +1261,18 @@ When using multi-project runner, it's recommended to add a `displayName` for eac
 
 :::
 
+:::note
+
+With the `projects` option enabled, Jest will copy the root-level configuration options to each individual child configuration during the test run, resolving its values in the child's context. This means that string tokens like `<rootDir>` will point to the _child's root directory_ even if they are defined in the root-level configuration.
+
+:::
+
+### `randomize` \[boolean]
+
+Default: `false`
+
+The equivalent of the [`--randomize`](CLI.md#--randomize) flag to randomize the order of the tests in a file.
+
 ### `reporters` \[array&lt;moduleName | \[moduleName, options]&gt;]
 
 Default: `undefined`
@@ -1270,12 +1335,12 @@ export default config;
 
 #### GitHub Actions Reporter
 
-If included in the list, the built-in GitHub Actions Reporter will annotate changed files with test failure messages:
+If included in the list, the built-in GitHub Actions Reporter will annotate changed files with test failure messages and (if used with `'silent: false'`) print logs with github group features for easy navigation. Note that `'default'` should not be used in this case as `'github-actions'` will handle that already, so remember to also include `'summary'`. If you wish to use it only for annotations simply leave only the reporter without options as the default value of `'silent'` is `'true'`:
 
 ```js tab
 /** @type {import('jest').Config} */
 const config = {
-  reporters: ['default', 'github-actions'],
+  reporters: [['github-actions', {silent: false}], 'summary'],
 };
 
 module.exports = config;
@@ -1285,7 +1350,7 @@ module.exports = config;
 import type {Config} from 'jest';
 
 const config: Config = {
-  reporters: ['default', 'github-actions'],
+  reporters: [['github-actions', {silent: false}], 'summary'],
 };
 
 export default config;
@@ -1314,6 +1379,29 @@ const config: Config = {
 export default config;
 ```
 
+The `summary` reporter accepts options. Since it is included in the `default` reporter you may also pass the options there.
+
+```js tab
+/** @type {import('jest').Config} */
+const config = {
+  reporters: [['default', {summaryThreshold: 10}]],
+};
+
+module.exports = config;
+```
+
+```ts tab
+import type {Config} from 'jest';
+
+const config: Config = {
+  reporters: [['default', {summaryThreshold: 10}]],
+};
+
+export default config;
+```
+
+The `summaryThreshold` option behaves in the following way, if the total number of test suites surpasses this threshold, a detailed summary of all failed tests will be printed after executing all the tests. It defaults to `20`.
+
 #### Custom Reporters
 
 :::tip
@@ -1322,7 +1410,7 @@ Hungry for reporters? Take a look at long list of [awesome reporters](https://gi
 
 :::
 
-Custom reporter module must export a class that takes `globalConfig`, `reporterOptions` and `reporterContext` as constructor arguments and implements at least `onRunComplete()` method (for the full list of methods and argument types see `Reporter` interface in [packages/jest-reporters/src/types.ts](https://github.com/facebook/jest/blob/main/packages/jest-reporters/src/types.ts)):
+Custom reporter module must export a class that takes [`globalConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L358-L422), `reporterOptions` and `reporterContext` as constructor arguments:
 
 ```js title="custom-reporter.js"
 class CustomReporter {
@@ -1334,9 +1422,9 @@ class CustomReporter {
 
   onRunComplete(testContexts, results) {
     console.log('Custom reporter output:');
-    console.log('global config: ', this._globalConfig);
-    console.log('options for this reporter from Jest config: ', this._options);
-    console.log('reporter context passed from test scheduler: ', this._context);
+    console.log('global config:', this._globalConfig);
+    console.log('options for this reporter from Jest config:', this._options);
+    console.log('reporter context passed from test scheduler:', this._context);
   }
 
   // Optionally, reporters can force Jest to exit with non zero code by returning
@@ -1350,6 +1438,12 @@ class CustomReporter {
 
 module.exports = CustomReporter;
 ```
+
+:::note
+
+For the full list of hooks and argument types see the `Reporter` interface in [packages/jest-reporters/src/types.ts](https://github.com/jestjs/jest/blob/main/packages/jest-reporters/src/types.ts).
+
+:::
 
 ### `resetMocks` \[boolean]
 
@@ -1504,7 +1598,7 @@ The `runner` property value can omit the `jest-runner-` prefix of the package na
 
 :::
 
-To write a test-runner, export a class with which accepts `globalConfig` in the constructor, and has a `runTests` method with the signature:
+To write a test-runner, export a class with which accepts [`globalConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L358-L422) in the constructor, and has a `runTests` method with the signature:
 
 ```ts
 async function runTests(
@@ -1600,11 +1694,23 @@ module.exports = config;
 import type {Config} from 'jest';
 
 const config: Config = {
-  setupFilesAfterEnv: ['<rootDir>/setup-matchers.js'],
+  setupFilesAfterEnv: ['<rootDir>/setup-jest.js'],
 };
 
 export default config;
 ```
+
+:::tip
+
+If your setup script is a CJS module, it may export an async function. Jest will call the function and await its result. This might be useful to fetch some data asynchronously. If the file is an ESM module, simply use top-level await to achieve the same result.
+
+:::
+
+### `showSeed` \[boolean]
+
+Default: `false`
+
+The equivalent of the [`--showSeed`](CLI.md#--showseed) flag to print the seed in the test report summary.
 
 ### `slowTestThreshold` \[number]
 
@@ -1614,7 +1720,7 @@ The number of seconds after which a test is considered as slow and reported as s
 
 ### `snapshotFormat` \[object]
 
-Default: `undefined`
+Default: `{escapeString: false, printBasicPrototype: false}`
 
 Allows overriding specific snapshot formatting options documented in the [pretty-format readme](https://www.npmjs.com/package/pretty-format#usage-with-options), with the exceptions of `compareKeys` and `plugins`. For example, this config would have the snapshot formatter not print a prefix for "Object" and "Array":
 
@@ -1647,14 +1753,14 @@ test('does not show prototypes for object and array inline', () => {
     array: [{hello: 'Danger'}],
   };
   expect(object).toMatchInlineSnapshot(`
-{
-  "array": [
     {
-      "hello": "Danger",
-    },
-  ],
-}
-    `);
+      "array": [
+        {
+          "hello": "Danger",
+        },
+      ],
+    }
+  `);
 });
 ```
 
@@ -1662,7 +1768,7 @@ test('does not show prototypes for object and array inline', () => {
 
 Default: `undefined`
 
-The path to a module that can resolve test<->snapshot path. This config option lets you customize where Jest stores snapshot files on disk.
+The path to a module that can resolve test\<->snapshot path. This config option lets you customize where Jest stores snapshot files on disk.
 
 ```js title="custom-resolver.js"
 module.exports = {
@@ -1748,9 +1854,13 @@ Pretty foo: Object {
 }
 ```
 
+:::tip
+
 To make a dependency explicit instead of implicit, you can call [`expect.addSnapshotSerializer`](ExpectAPI.md#expectaddsnapshotserializerserializer) to add a module for an individual test file instead of adding its path to `snapshotSerializers` in Jest configuration.
 
-More about serializers API can be found [here](https://github.com/facebook/jest/tree/main/packages/pretty-format/README.md#serialize).
+More about serializers API can be found [here](https://github.com/jestjs/jest/tree/main/packages/pretty-format/README.md#serialize).
+
+:::
 
 ### `testEnvironment` \[string]
 
@@ -1771,9 +1881,9 @@ test('use jsdom in this test file', () => {
 });
 ```
 
-You can create your own module that will be used for setting up the test environment. The module must export a class with `setup`, `teardown` and `getVmContext` methods. You can also pass variables from this module to your test suites by assigning them to `this.global` object &ndash; this will make them available in your test suites as global variables. The constructor is passed [global config](https://github.com/facebook/jest/blob/491e7cb0f2daa8263caccc72d48bdce7ba759b11/packages/jest-types/src/Config.ts#L284) and [project config](https://github.com/facebook/jest/blob/491e7cb0f2daa8263caccc72d48bdce7ba759b11/packages/jest-types/src/Config.ts#L349) as its first argument, and [`testEnvironmentContext`](https://github.com/facebook/jest/blob/491e7cb0f2daa8263caccc72d48bdce7ba759b11/packages/jest-environment/src/index.ts#L13) as its second.
+You can create your own module that will be used for setting up the test environment. The module must export a class with `setup`, `teardown` and `getVmContext` methods. You can also pass variables from this module to your test suites by assigning them to `this.global` object &ndash; this will make them available in your test suites as global variables. The constructor is passed [`globalConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L358-L422) and [`projectConfig`](https://github.com/jestjs/jest/blob/v29.2.1/packages/jest-types/src/Config.ts#L424-L481) as its first argument, and [`testEnvironmentContext`](https://github.com/jestjs/jest/blob/491e7cb0f2daa8263caccc72d48bdce7ba759b11/packages/jest-environment/src/index.ts#L13) as its second.
 
-The class may optionally expose an asynchronous `handleTestEvent` method to bind to events fired by [`jest-circus`](https://github.com/facebook/jest/tree/main/packages/jest-circus). Normally, `jest-circus` test runner would pause until a promise returned from `handleTestEvent` gets fulfilled, **except for the next events**: `start_describe_definition`, `finish_describe_definition`, `add_hook`, `add_test` or `error` (for the up-to-date list you can look at [SyncEvent type in the types definitions](https://github.com/facebook/jest/tree/main/packages/jest-types/src/Circus.ts)). That is caused by backward compatibility reasons and `process.on('unhandledRejection', callback)` signature, but that usually should not be a problem for most of the use cases.
+The class may optionally expose an asynchronous `handleTestEvent` method to bind to events fired by [`jest-circus`](https://github.com/jestjs/jest/tree/main/packages/jest-circus). Normally, `jest-circus` test runner would pause until a promise returned from `handleTestEvent` gets fulfilled, **except for the next events**: `start_describe_definition`, `finish_describe_definition`, `add_hook`, `add_test` or `error` (for the up-to-date list you can look at [SyncEvent type in the types definitions](https://github.com/jestjs/jest/tree/main/packages/jest-types/src/Circus.ts)). That is caused by backward compatibility reasons and `process.on('unhandledRejection', callback)` signature, but that usually should not be a problem for most of the use cases.
 
 Any docblock pragmas in test files will be passed to the environment constructor and can be used for per-test configuration. If the pragma does not have a value, it will be present in the object with its value set to an empty string. If the pragma is not present, it will not be present in the object.
 
@@ -1795,7 +1905,7 @@ Example:
 
 ```js
 // my-custom-environment
-const NodeEnvironment = require('jest-environment-node').default;
+const NodeEnvironment = require('jest-environment-node').TestEnvironment;
 
 class CustomEnvironment extends NodeEnvironment {
   constructor(config, context) {
@@ -1855,11 +1965,65 @@ Default: `{}`
 
 Test environment options that will be passed to the `testEnvironment`. The relevant options depend on the environment.
 
-For example, in `jest-environment-jsdom`, you can override options given to [`jsdom`](https://github.com/jsdom/jsdom) such as `{html: "<html lang="zh-cmn-Hant"></html>", url: 'https://jestjs.io/', userAgent: "Agent/007"}`.
+For example, you can override options passed to [`jsdom`](https://github.com/jsdom/jsdom):
+
+```js tab
+/** @type {import('jest').Config} */
+const config = {
+  testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    html: '<html lang="zh-cmn-Hant"></html>',
+    url: 'https://jestjs.io/',
+    userAgent: 'Agent/007',
+  },
+};
+
+module.exports = config;
+```
+
+```ts tab
+import type {Config} from 'jest';
+
+const config: Config = {
+  testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    html: '<html lang="zh-cmn-Hant"></html>',
+    url: 'https://jestjs.io/',
+    userAgent: 'Agent/007',
+  },
+};
+
+export default config;
+```
 
 Both `jest-environment-jsdom` and `jest-environment-node` allow specifying `customExportConditions`, which allow you to control which versions of a library are loaded from `exports` in `package.json`. `jest-environment-jsdom` defaults to `['browser']`. `jest-environment-node` defaults to `['node', 'node-addons']`.
 
-These options can also be passed in a docblock, similar to `testEnvironment`. Note that it must be parseable by `JSON.parse`. Example:
+```js tab
+/** @type {import('jest').Config} */
+const config = {
+  testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    customExportConditions: ['react-native'],
+  },
+};
+
+module.exports = config;
+```
+
+```ts tab
+import type {Config} from 'jest';
+
+const config: Config = {
+  testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    customExportConditions: ['react-native'],
+  },
+};
+
+export default config;
+```
+
+These options can also be passed in a docblock, similar to `testEnvironment`. The string with options must be parseable by `JSON.parse`:
 
 ```js
 /**
@@ -1886,7 +2050,7 @@ This does not change the exit code in the case of Jest errors (e.g. invalid conf
 
 ### `testMatch` \[array&lt;string&gt;]
 
-(default: `[ "**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)" ]`)
+(default: `[ "**/__tests__/**/*.?([mc])[jt]s?(x)", "**/?(*.)+(spec|test).?([mc])[jt]s?(x)" ]`)
 
 The glob patterns Jest uses to detect test files. By default it looks for `.js`, `.jsx`, `.ts` and `.tsx` files inside of `__tests__` folders, as well as any files with a suffix of `.test` or `.spec` (e.g. `Component.test.js` or `Component.spec.js`). It will also find files called `test.js` or `spec.js`.
 
@@ -1910,7 +2074,7 @@ These pattern strings match against the full path. Use the `<rootDir>` string to
 
 ### `testRegex` \[string | array&lt;string&gt;]
 
-Default: `(/__tests__/.*|(\\.|/)(test|spec))\\.[jt]sx?$`
+Default: `(/__tests__/.*|(\\.|/)(test|spec))\\.[mc]?[jt]sx?$`
 
 The pattern or patterns Jest uses to detect test files. By default it looks for `.js`, `.jsx`, `.ts` and `.tsx` files inside of `__tests__` folders, as well as any files with a suffix of `.test` or `.spec` (e.g. `Component.test.js` or `Component.spec.js`). It will also find files called `test.js` or `spec.js`. See also [`testMatch` [array&lt;string&gt;]](#testmatch-arraystring), but note that you cannot specify both options.
 
@@ -1966,13 +2130,22 @@ This option allows the use of a custom results processor. This processor must be
         "column": number,
         "line": number
       },
-      "duration": number | null
+      "duration": number | null,
+      "startAt": epoch | null
     },
     ...
     ],
     "perfStats": {
-      "start": epoch,
-      "end": epoch
+      "end": epoch,
+      "loadTestEnvironmentEnd": epoch,
+      "loadTestEnvironmentStart": epoch,
+      "runtime": number,
+      "setupAfterEnvEnd": epoch,
+      "setupAfterEnvStart": epoch,
+      "setupFilesEnd": epoch,
+      "setupFilesStart": epoch,
+      "slow": boolean,
+      "start": epoch
     },
     "testFilePath": absolute path to test file,
     "coverage": {}
@@ -2006,7 +2179,7 @@ function testRunner(
 ): Promise<TestResult>;
 ```
 
-An example of such function can be found in our default [jasmine2 test runner package](https://github.com/facebook/jest/blob/main/packages/jest-jasmine2/src/index.ts).
+An example of such function can be found in our default [jasmine2 test runner package](https://github.com/jestjs/jest/blob/main/packages/jest-jasmine2/src/index.ts).
 
 ### `testSequencer` \[string]
 
@@ -2031,9 +2204,9 @@ class CustomSequencer extends Sequencer {
    * Sharding is applied before sorting
    */
   shard(tests, {shardIndex, shardCount}) {
-    const shardSize = Math.ceil(tests.length / options.shardCount);
-    const shardStart = shardSize * (options.shardIndex - 1);
-    const shardEnd = shardSize * options.shardIndex;
+    const shardSize = Math.ceil(tests.length / shardCount);
+    const shardStart = shardSize * (shardIndex - 1);
+    const shardEnd = shardSize * shardIndex;
 
     return [...tests]
       .sort((a, b) => (a.path > b.path ? 1 : -1))
@@ -2046,8 +2219,8 @@ class CustomSequencer extends Sequencer {
    */
   sort(tests) {
     // Test structure information
-    // https://github.com/facebook/jest/blob/6b8b1404a1d9254e7d5d90a8934087a9c9899dab/packages/jest-runner/src/types.ts#L17-L21
-    const copyTests = Array.from(tests);
+    // https://github.com/jestjs/jest/blob/6b8b1404a1d9254e7d5d90a8934087a9c9899dab/packages/jest-runner/src/types.ts#L17-L21
+    const copyTests = [...tests];
     return copyTests.sort((testA, testB) => (testA.path > testB.path ? 1 : -1));
   }
 }
@@ -2088,7 +2261,7 @@ Default: `{"\\.[jt]sx?$": "babel-jest"}`
 
 A map from regular expressions to paths to transformers. Optionally, a tuple with configuration options can be passed as second argument: `{filePattern: ['path-to-transformer', {options}]}`. For example, here is how you can configure `babel-jest` for non-default behavior: `{'\\.js$': ['babel-jest', {rootMode: 'upward'}]}`.
 
-Jest runs the code of your project as JavaScript, hence a transformer is needed if you use some syntax not supported by Node out of the box (such as JSX, TypeScript, Vue templates). By default, Jest will use [`babel-jest`](https://github.com/facebook/jest/tree/main/packages/babel-jest#setup) transformer, which will load your project's Babel configuration and transform any file matching the `/\.[jt]sx?$/` RegExp (in other words, any `.js`, `.jsx`, `.ts` or `.tsx` file). In addition, `babel-jest` will inject the Babel plugin necessary for mock hoisting talked about in [ES Module mocking](ManualMocks.md#using-with-es-module-imports).
+Jest runs the code of your project as JavaScript, hence a transformer is needed if you use some syntax not supported by Node out of the box (such as JSX, TypeScript, Vue templates). By default, Jest will use [`babel-jest`](https://github.com/jestjs/jest/tree/main/packages/babel-jest#setup) transformer, which will load your project's Babel configuration and transform any file matching the `/\.[jt]sx?$/` RegExp (in other words, any `.js`, `.jsx`, `.ts` or `.tsx` file). In addition, `babel-jest` will inject the Babel plugin necessary for mock hoisting talked about in [ES Module mocking](ManualMocks.md#using-with-es-module-imports).
 
 See the [Code Transformation](CodeTransformation.md) section for more details and instructions on building your own transformer.
 
@@ -2183,21 +2356,74 @@ const config: Config = {
 export default config;
 ```
 
+:::tip
+
+If you use `pnpm` and need to convert some packages under `node_modules`, you need to note that the packages in this folder (e.g. `node_modules/package-a/`) have been symlinked to the path under `.pnpm` (e.g. `node_modules/.pnpm/package-a@x.x.x/node_modules/package-a/`), so using `<rootDir>/node_modules/(?!(package-a|@scope/pkg-b)/)` directly will not be recognized, while is to use:
+
+```js tab
+/** @type {import('jest').Config} */
+const config = {
+  transformIgnorePatterns: [
+    '<rootDir>/node_modules/.pnpm/(?!(package-a|@scope\\+pkg-b)@)',
+    /* if config file is under '~/packages/lib-a/' */
+    `${path.join(
+      __dirname,
+      '../..',
+    )}/node_modules/.pnpm/(?!(package-a|@scope\\+pkg-b)@)`,
+    /* or using relative pattern to match the second 'node_modules/' in 'node_modules/.pnpm/@scope+pkg-b@x.x.x/node_modules/@scope/pkg-b/' */
+    'node_modules/(?!.pnpm|package-a|@scope/pkg-b)',
+  ],
+};
+
+module.exports = config;
+```
+
+```ts tab
+import type {Config} from 'jest';
+
+const config: Config = {
+  transformIgnorePatterns: [
+    '<rootDir>/node_modules/.pnpm/(?!(package-a|@scope\\+pkg-b)@)',
+    /* if config file is under '~/packages/lib-a/' */
+    `${path.join(
+      __dirname,
+      '../..',
+    )}/node_modules/.pnpm/(?!(package-a|@scope\\+pkg-b)@)`,
+    /* or using relative path to match the second 'node_modules/' in 'node_modules/.pnpm/@scope+pkg-b@x.x.x/node_modules/@scope/pkg-b/' */
+    'node_modules/(?!.pnpm|package-a|@scope/pkg-b)',
+  ],
+};
+
+export default config;
+```
+
+It should be noted that the folder name of pnpm under `.pnpm` is the package name plus `@` and version number, so writing `/` will not be recognized, but using `@` can.
+
+:::
+
 ### `unmockedModulePathPatterns` \[array&lt;string&gt;]
 
 Default: `[]`
 
 An array of regexp pattern strings that are matched against all modules before the module loader will automatically return a mock for them. If a module's path matches any of the patterns in this list, it will not be automatically mocked by the module loader.
 
-This is useful for some commonly used 'utility' modules that are almost always used as implementation details almost all the time (like underscore/lo-dash, etc). It's generally a best practice to keep this list as small as possible and always use explicit `jest.mock()`/`jest.unmock()` calls in individual tests. Explicit per-test setup is far easier for other readers of the test to reason about the environment the test will run in.
+This is useful for some commonly used 'utility' modules that are almost always used as implementation details almost all the time (like `underscore`, `lodash`, etc). It's generally a best practice to keep this list as small as possible and always use explicit `jest.mock()`/`jest.unmock()` calls in individual tests. Explicit per-test setup is far easier for other readers of the test to reason about the environment the test will run in.
 
 It is possible to override this setting in individual tests by explicitly calling `jest.mock()` at the top of the test file.
 
 ### `verbose` \[boolean]
 
-Default: `false`
+Default: `false` or `true` if there is only one test file to run
 
-Indicates whether each individual test should be reported during the run. All errors will also still be shown on the bottom after execution. Note that if there is only one test file being run it will default to `true`.
+Indicates whether each individual test should be reported during the run. All errors will also still be shown on the bottom after execution.
+
+### `waitNextEventLoopTurnForUnhandledRejectionEvents` \[boolean]
+
+Gives one event loop turn to handle `rejectionHandled`, `uncaughtException` or `unhandledRejection`.
+
+Without this flag Jest may report false-positive errors (e.g. actually handled rejection reported) or not report actually unhandled rejection (or report it for different test case).
+
+This option may add a noticeable overhead for fast test suites.
 
 ### `watchPathIgnorePatterns` \[array&lt;string&gt;]
 
@@ -2207,7 +2433,7 @@ An array of RegExp patterns that are matched against all source file paths befor
 
 These patterns match against the full path. Use the `<rootDir>` string token to include the path to your project's root directory to prevent it from accidentally ignoring all of your files in different environments that may have different root directories. Example: `["<rootDir>/node_modules/"]`.
 
-Even if nothing is specified here, the watcher will ignore changes to the version control folders (.git, .hg). Other hidden files and directories, i.e. those that begin with a dot (`.`), are watched by default. Remember to escape the dot when you add them to `watchPathIgnorePatterns` as it is a special RegExp character.
+Even if nothing is specified here, the watcher will ignore changes to the version control folders (.git, .hg, .sl). Other hidden files and directories, i.e. those that begin with a dot (`.`), are watched by default. Remember to escape the dot when you add them to `watchPathIgnorePatterns` as it is a special RegExp character.
 
 ```js tab
 /** @type {import('jest').Config} */
@@ -2254,6 +2480,51 @@ Default: `true`
 
 Whether to use [`watchman`](https://facebook.github.io/watchman/) for file crawling.
 
+### `workerIdleMemoryLimit` \[number|string]
+
+Default: `undefined`
+
+Specifies the memory limit for workers before they are recycled and is primarily a work-around for [this issue](https://github.com/jestjs/jest/issues/11956);
+
+After the worker has executed a test the memory usage of it is checked. If it exceeds the value specified the worker is killed and restarted. The limit can be specified in a number of different ways and whatever the result is `Math.floor` is used to turn it into an integer value:
+
+- `<= 1` - The value is assumed to be a percentage of system memory. So 0.5 sets the memory limit of the worker to half of the total system memory
+- `\> 1` - Assumed to be a fixed byte value. Because of the previous rule if you wanted a value of 1 byte (I don't know why) you could use `1.1`.
+- With units
+  - `50%` - As above, a percentage of total system memory
+  - `100KB`, `65MB`, etc - With units to denote a fixed memory limit.
+    - `K` / `KB` - Kilobytes (x1000)
+    - `KiB` - Kibibytes (x1024)
+    - `M` / `MB` - Megabytes
+    - `MiB` - Mebibytes
+    - `G` / `GB` - Gigabytes
+    - `GiB` - Gibibytes
+
+:::caution
+
+Percentage based memory limit [does not work on Linux CircleCI workers](https://github.com/jestjs/jest/issues/11956#issuecomment-1212925677) due to incorrect system memory being reported.
+
+:::
+
+```js tab
+/** @type {import('jest').Config} */
+const config = {
+  workerIdleMemoryLimit: 0.2,
+};
+
+module.exports = config;
+```
+
+```ts tab
+import type {Config} from 'jest';
+
+const config: Config = {
+  workerIdleMemoryLimit: 0.2,
+};
+
+export default config;
+```
+
 ### `//` \[string]
 
 This option allows comments in `package.json`. Include the comment text as the value of this key:
@@ -2267,3 +2538,17 @@ This option allows comments in `package.json`. Include the comment text as the v
   }
 }
 ```
+
+### `workerThreads`
+
+Default: `false`
+
+Whether to use [worker threads](https://nodejs.org/dist/latest/docs/api/worker_threads.html) for parallelization. [Child processes](https://nodejs.org/dist/latest/docs/api/child_process.html) are used by default.
+
+Using worker threads may help to improve [performance](https://github.com/nodejs/node/discussions/44264).
+
+:::caution
+
+This is **experimental feature**. Keep in mind that the worker threads use structured clone instead of `JSON.stringify()` to serialize messages. This means that built-in JavaScript objects as `BigInt`, `Map` or `Set` will get serialized properly. However extra properties set on `Error`, `Map` or `Set` will not be passed on through the serialization step. For more details see the article on [structured clone](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm).
+
+:::

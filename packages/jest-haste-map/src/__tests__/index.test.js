@@ -1,12 +1,12 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import * as path from 'path';
 
 function mockHashContents(contents) {
@@ -45,7 +45,7 @@ jest.mock('../crawlers/watchman', () => ({
 
     for (const file in list) {
       if (
-        new RegExp(roots.join('|').replace(/\\/g, '\\\\')).test(file) &&
+        new RegExp(roots.join('|').replaceAll('\\', '\\\\')).test(file) &&
         !ignore(file)
       ) {
         const relativeFilePath = path.relative(rootDir, file);
@@ -130,7 +130,7 @@ const useBuitinsInContext = value => {
   switch (stringTag) {
     case '[object Map]':
       return new Map(
-        Array.from(value).map(([k, v]) => [
+        [...value].map(([k, v]) => [
           useBuitinsInContext(k),
           useBuitinsInContext(v),
         ]),
@@ -346,6 +346,14 @@ describe('HasteMap', () => {
     expect(hasteFS.matchFiles('.git')).toEqual([]);
   });
 
+  it('ignores sapling vcs directories without ignore pattern', async () => {
+    mockFs[path.join('/', 'project', 'fruits', '.sl', 'package.json')] = `
+      invalid}{
+    `;
+    const {hasteFS} = await (await HasteMap.create(defaultConfig)).build();
+    expect(hasteFS.matchFiles('.sl')).toEqual([]);
+  });
+
   it('ignores vcs directories with ignore pattern regex', async () => {
     const config = {...defaultConfig, ignorePattern: /Kiwi/};
     mockFs[path.join('/', 'project', 'fruits', 'Kiwi.js')] = `
@@ -368,8 +376,8 @@ describe('HasteMap', () => {
 
     try {
       await (await HasteMap.create(config)).build();
-    } catch (err) {
-      expect(err.message).toBe(
+    } catch (error) {
+      expect(error.message).toBe(
         'jest-haste-map: the `ignorePattern` option must be a RegExp',
       );
     }
@@ -693,7 +701,7 @@ describe('HasteMap', () => {
 
     expect(data.map.get('IRequireAVideo')).toBeDefined();
     expect(data.files.get(path.join('video', 'video.mp4'))).toBeDefined();
-    expect(fs.readFileSync).not.toBeCalledWith(
+    expect(fs.readFileSync).not.toHaveBeenCalledWith(
       path.join('video', 'video.mp4'),
       'utf8',
     );
@@ -719,10 +727,10 @@ describe('HasteMap', () => {
       data.files.get(path.join('fruits', 'node_modules', 'fbjs', 'fbjs.js')),
     ).toEqual(['', 32, 42, 0, [], null]);
 
-    expect(data.map.get('fbjs')).not.toBeDefined();
+    expect(data.map.get('fbjs')).toBeUndefined();
 
     // cache file + 5 modules - the node_module
-    expect(fs.readFileSync.mock.calls.length).toBe(6);
+    expect(fs.readFileSync).toHaveBeenCalledTimes(6);
   });
 
   it('warns on duplicate mock files', async () => {
@@ -764,7 +772,7 @@ describe('HasteMap', () => {
       ).build();
     } catch {
       expect(
-        console.error.mock.calls[0][0].replace(/\\/g, '/'),
+        console.error.mock.calls[0][0].replaceAll('\\', '/'),
       ).toMatchSnapshot();
     }
   });
@@ -780,9 +788,11 @@ describe('HasteMap', () => {
 
     // Duplicate modules are removed so that it doesn't cause
     // non-determinism later on.
-    expect(data.map.get('Strawberry')[H.GENERIC_PLATFORM]).not.toBeDefined();
+    expect(data.map.get('Strawberry')[H.GENERIC_PLATFORM]).toBeUndefined();
 
-    expect(console.warn.mock.calls[0][0].replace(/\\/g, '/')).toMatchSnapshot();
+    expect(
+      console.warn.mock.calls[0][0].replaceAll('\\', '/'),
+    ).toMatchSnapshot();
   });
 
   it('warns on duplicate module ids only once', async () => {
@@ -811,8 +821,8 @@ describe('HasteMap', () => {
           ...defaultConfig,
         })
       ).build();
-    } catch (err) {
-      expect(err.message).toBe(
+    } catch (error) {
+      expect(error.message).toBe(
         'Duplicated files or mocks. Please check the console for more info',
       );
     }
@@ -886,7 +896,7 @@ describe('HasteMap', () => {
 
     // The first run should access the file system once for the (empty)
     // cache file and five times for the files in the system.
-    expect(fs.readFileSync.mock.calls.length).toBe(6);
+    expect(fs.readFileSync).toHaveBeenCalledTimes(6);
 
     fs.readFileSync.mockClear();
 
@@ -902,11 +912,11 @@ describe('HasteMap', () => {
     const {__hasteMapForTest: data} = await (
       await HasteMap.create(defaultConfig)
     ).build();
-    expect(fs.readFileSync.mock.calls.length).toBe(1);
+    expect(fs.readFileSync).toHaveBeenCalledTimes(1);
     if (require('v8').deserialize) {
-      expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
+      expect(fs.readFileSync).toHaveBeenCalledWith(cacheFilePath);
     } else {
-      expect(fs.readFileSync).toBeCalledWith(cacheFilePath, 'utf8');
+      expect(fs.readFileSync).toHaveBeenCalledWith(cacheFilePath, 'utf8');
     }
     expect(useBuitinsInContext(data.clocks)).toEqual(mockClocks);
     expect(useBuitinsInContext(data.files)).toEqual(initialData.files);
@@ -936,14 +946,14 @@ describe('HasteMap', () => {
       await HasteMap.create(defaultConfig)
     ).build();
 
-    expect(fs.readFileSync.mock.calls.length).toBe(2);
+    expect(fs.readFileSync).toHaveBeenCalledTimes(2);
 
     if (require('v8').serialize) {
-      expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
+      expect(fs.readFileSync).toHaveBeenCalledWith(cacheFilePath);
     } else {
-      expect(fs.readFileSync).toBeCalledWith(cacheFilePath, 'utf8');
+      expect(fs.readFileSync).toHaveBeenCalledWith(cacheFilePath, 'utf8');
     }
-    expect(fs.readFileSync).toBeCalledWith(
+    expect(fs.readFileSync).toHaveBeenCalledWith(
       path.join('/', 'project', 'fruits', 'Banana.js'),
       'utf8',
     );
@@ -1087,9 +1097,8 @@ describe('HasteMap', () => {
 
   describe('duplicate modules', () => {
     beforeEach(async () => {
-      mockFs[
-        path.join('/', 'project', 'fruits', 'another', 'Strawberry.js')
-      ] = `
+      mockFs[path.join('/', 'project', 'fruits', 'another', 'Strawberry.js')] =
+        `
         const Blackberry = require("Blackberry");
       `;
 
@@ -1234,7 +1243,7 @@ describe('HasteMap', () => {
 
     const config = {...defaultConfig, ignorePattern: /Kiwi|Pear/};
     const {moduleMap} = await (await HasteMap.create(config)).build();
-    expect(moduleMap.getModule('Pear')).toBe(null);
+    expect(moduleMap.getModule('Pear')).toBeNull();
   });
 
   it('ignores files that do not exist', async () => {
@@ -1261,9 +1270,9 @@ describe('HasteMap', () => {
     expect(data.files.size).toBe(5);
 
     // Ensure this file is not part of the file list.
-    expect(data.files.get(path.join('fruits', 'invalid', 'file.js'))).toBe(
-      undefined,
-    );
+    expect(
+      data.files.get(path.join('fruits', 'invalid', 'file.js')),
+    ).toBeUndefined();
   });
 
   it('distributes work across workers', async () => {
@@ -1279,9 +1288,9 @@ describe('HasteMap', () => {
       })
     ).build();
 
-    expect(jestWorker.mock.calls.length).toBe(1);
+    expect(jestWorker).toHaveBeenCalledTimes(1);
 
-    expect(mockWorker.mock.calls.length).toBe(5);
+    expect(mockWorker).toHaveBeenCalledTimes(5);
 
     expect(mockWorker.mock.calls).toEqual([
       [
@@ -1336,7 +1345,7 @@ describe('HasteMap', () => {
       ],
     ]);
 
-    expect(mockEnd).toBeCalled();
+    expect(mockEnd).toHaveBeenCalled();
   });
 
   it('tries to crawl using node as a fallback', async () => {
@@ -1360,8 +1369,8 @@ describe('HasteMap', () => {
     const {__hasteMapForTest: data} = await (
       await HasteMap.create(defaultConfig)
     ).build();
-    expect(watchman).toBeCalled();
-    expect(node).toBeCalled();
+    expect(watchman).toHaveBeenCalled();
+    expect(node).toHaveBeenCalled();
 
     expect(data.files).toEqual(
       createMap({
@@ -1401,8 +1410,8 @@ describe('HasteMap', () => {
       await HasteMap.create(defaultConfig)
     ).build();
 
-    expect(watchman).toBeCalled();
-    expect(node).toBeCalled();
+    expect(watchman).toHaveBeenCalled();
+    expect(node).toHaveBeenCalled();
 
     expect(data.files).toEqual(
       createMap({
@@ -1704,7 +1713,7 @@ describe('HasteMap', () => {
                 H.MODULE,
             }),
           );
-          expect(error.message.replace(/\\/g, '/')).toMatchSnapshot();
+          expect(error.message.replaceAll('\\', '/')).toMatchSnapshot();
         }
       }
 

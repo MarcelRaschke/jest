@@ -1,12 +1,12 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
+import {TestPathPatterns} from '@jest/pattern';
 import type {Config} from '@jest/types';
-import {replacePathSepForRegex} from 'jest-regex-util';
 import type {AllowedConfigOptions} from 'jest-watcher';
 
 type ExtraConfigOptions = Partial<
@@ -31,15 +31,14 @@ export default function updateGlobalConfig(
     newConfig.testNamePattern = options.testNamePattern || '';
   }
 
-  if (options.testPathPattern !== undefined) {
-    newConfig.testPathPattern =
-      replacePathSepForRegex(options.testPathPattern) || '';
+  if (options.testPathPatterns !== undefined) {
+    newConfig.testPathPatterns = new TestPathPatterns(options.testPathPatterns);
   }
 
   newConfig.onlyChanged =
     !newConfig.watchAll &&
     !newConfig.testNamePattern &&
-    !newConfig.testPathPattern;
+    !newConfig.testPathPatterns.isSet();
 
   if (typeof options.bail === 'boolean') {
     newConfig.bail = options.bail ? 1 : 0;
@@ -57,10 +56,6 @@ export default function updateGlobalConfig(
 
   if (options.collectCoverageFrom !== undefined) {
     newConfig.collectCoverageFrom = options.collectCoverageFrom;
-  }
-
-  if (options.collectCoverageOnlyFrom !== undefined) {
-    newConfig.collectCoverageOnlyFrom = options.collectCoverageOnlyFrom;
   }
 
   if (options.coverageDirectory !== undefined) {

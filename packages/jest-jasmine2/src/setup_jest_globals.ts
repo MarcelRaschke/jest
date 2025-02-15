@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -32,7 +32,7 @@ export type SetupOptions = {
 const addSuppressedErrors = (result: SpecResult) => {
   const {suppressedErrors} = jestExpect.getState();
   jestExpect.setState({suppressedErrors: []});
-  if (suppressedErrors.length) {
+  if (suppressedErrors.length > 0) {
     result.status = 'failed';
 
     result.failedExpectations = suppressedErrors.map(error => ({
@@ -50,7 +50,7 @@ const addSuppressedErrors = (result: SpecResult) => {
 
 const addAssertionErrors = (result: SpecResult) => {
   const assertionErrors = jestExpect.extractExpectedAssertionsErrors();
-  if (assertionErrors.length) {
+  if (assertionErrors.length > 0) {
     const jasmineErrors = assertionErrors.map(({actual, error, expected}) => ({
       actual,
       expected,
@@ -58,7 +58,10 @@ const addAssertionErrors = (result: SpecResult) => {
       passed: false,
     }));
     result.status = 'failed';
-    result.failedExpectations = result.failedExpectations.concat(jasmineErrors);
+    result.failedExpectations = [
+      ...result.failedExpectations,
+      ...jasmineErrors,
+    ];
   }
 };
 
@@ -95,21 +98,19 @@ export default async function setupJestGlobals({
 }: SetupOptions): Promise<SnapshotState> {
   // Jest tests snapshotSerializers in order preceding built-in serializers.
   // Therefore, add in reverse because the last added is the first tested.
-  config.snapshotSerializers
-    .concat()
-    .reverse()
-    .forEach(path => {
-      addSerializer(localRequire(path));
-    });
+  for (let i = config.snapshotSerializers.length - 1; i >= 0; i--) {
+    addSerializer(localRequire(config.snapshotSerializers[i]));
+  }
 
   patchJasmine();
   const {expand, updateSnapshot} = globalConfig;
-  const {prettierPath, snapshotFormat} = config;
+  const {prettierPath, rootDir, snapshotFormat} = config;
   const snapshotResolver = await buildSnapshotResolver(config, localRequire);
   const snapshotPath = snapshotResolver.resolveSnapshotPath(testPath);
   const snapshotState = new SnapshotState(snapshotPath, {
     expand,
     prettierPath,
+    rootDir,
     snapshotFormat,
     updateSnapshot,
   });

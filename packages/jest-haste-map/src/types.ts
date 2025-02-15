@@ -1,11 +1,12 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import type {Stats} from 'graceful-fs';
+// eslint-disable-next-line no-restricted-imports
+import type {Stats} from 'fs';
 import type HasteFS from './HasteFS';
 import type ModuleMap from './ModuleMap';
 
@@ -37,6 +38,25 @@ export interface IModuleMap<S = SerializableModuleMap> {
   getRawModuleMap(): RawModuleMap;
 
   toJSON(): S;
+}
+
+export interface IHasteFS {
+  exists(path: string): boolean;
+  getAbsoluteFileIterator(): Iterable<string>;
+  getAllFiles(): Array<string>;
+  getDependencies(file: string): Array<string> | null;
+  getSize(path: string): number | null;
+  matchFiles(pattern: RegExp | string): Array<string>;
+  matchFilesWithGlob(
+    globs: ReadonlyArray<string>,
+    root: string | null,
+  ): Set<string>;
+  getModuleName(file: string): string | null;
+}
+
+export interface IHasteMap {
+  on(eventType: 'change', handler: (event: ChangeEvent) => void): void;
+  build(): Promise<{hasteFS: IHasteFS; moduleMap: IModuleMap}>;
 }
 
 export type HasteMapStatic<S = SerializableModuleMap> = {

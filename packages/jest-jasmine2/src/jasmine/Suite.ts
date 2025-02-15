@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,7 @@
  */
 // This file is a heavily modified fork of Jasmine. Original license:
 /*
-Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+Copyright (c) 2008-2016 Pivotal Labs
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-/* eslint-disable sort-keys, local/prefer-spread-eventually, local/prefer-rest-params-eventually */
+/* eslint-disable sort-keys */
 
 import type {Circus} from '@jest/types';
 import {convertDescriptorToString} from 'jest-util';
@@ -159,7 +159,7 @@ export default class Suite {
   }
 
   getResult() {
-    this.result.status! = this.status();
+    this.result.status = this.status();
     return this.result;
   }
 
@@ -190,8 +190,7 @@ export default class Suite {
       };
       this.result.failedExpectations.push(expectationResultFactory(data));
     } else {
-      for (let i = 0; i < this.children.length; i++) {
-        const child = this.children[i];
+      for (const child of this.children) {
         child.onException.apply(child, args);
       }
     }
@@ -205,8 +204,7 @@ export default class Suite {
         throw new ExpectationFailed();
       }
     } else {
-      for (let i = 0; i < this.children.length; i++) {
-        const child = this.children[i];
+      for (const child of this.children) {
         try {
           child.addExpectationResult.apply(child, args);
         } catch {

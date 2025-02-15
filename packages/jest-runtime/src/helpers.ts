@@ -1,12 +1,12 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import * as path from 'path';
-import glob = require('glob');
+import {glob} from 'glob';
 import slash = require('slash');
 import type {Config} from '@jest/types';
 
@@ -42,7 +42,7 @@ export const findSiblingsWithFileExtension = (
       const slashedDirname = slash(dirname);
 
       const matches = glob
-        .sync(`${pathToModule}.*`)
+        .sync(`${pathToModule}.*`, {windowsPathsNoEscape: true})
         .map(match => slash(match))
         .map(match => {
           const relativePath = path.posix.relative(slashedDirname, match);

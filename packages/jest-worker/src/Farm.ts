@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -8,17 +8,17 @@
 import FifoQueue from './FifoQueue';
 import {
   CHILD_MESSAGE_CALL,
-  ChildMessage,
-  OnCustomMessage,
-  OnEnd,
-  OnStart,
-  PromiseWithCustomMessage,
-  QueueChildMessage,
-  TaskQueue,
-  WorkerCallback,
-  WorkerFarmOptions,
-  WorkerInterface,
-  WorkerSchedulingPolicy,
+  type ChildMessage,
+  type OnCustomMessage,
+  type OnEnd,
+  type OnStart,
+  type PromiseWithCustomMessage,
+  type QueueChildMessage,
+  type TaskQueue,
+  type WorkerCallback,
+  type WorkerFarmOptions,
+  type WorkerInterface,
+  type WorkerSchedulingPolicy,
 } from './types';
 
 export default class Farm {
@@ -31,8 +31,8 @@ export default class Farm {
   private readonly _taskQueue: TaskQueue;
 
   constructor(
-    private _numOfWorkers: number,
-    private _callback: WorkerCallback,
+    private readonly _numOfWorkers: number,
+    private readonly _callback: WorkerCallback,
     options: WorkerFarmOptions = {},
   ) {
     this._computeWorkerKey = options.computeWorkerKey;
@@ -55,7 +55,7 @@ export default class Farm {
     };
 
     const onCustomMessage: OnCustomMessage = message => {
-      customMessageListeners.forEach(listener => listener(message));
+      for (const listener of customMessageListeners) listener(message);
     };
 
     const promise: PromiseWithCustomMessage<unknown> = new Promise(

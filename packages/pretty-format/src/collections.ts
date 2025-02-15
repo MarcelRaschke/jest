@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -12,14 +12,16 @@ const getKeysOfEnumerableProperties = (
   object: Record<string, unknown>,
   compareKeys: CompareKeys,
 ) => {
-  const keys: Array<string | symbol> = Object.keys(object).sort(compareKeys);
+  const rawKeys = Object.keys(object);
+  const keys: Array<string | symbol> =
+    compareKeys === null ? rawKeys : rawKeys.sort(compareKeys);
 
   if (Object.getOwnPropertySymbols) {
-    Object.getOwnPropertySymbols(object).forEach(symbol => {
+    for (const symbol of Object.getOwnPropertySymbols(object)) {
       if (Object.getOwnPropertyDescriptor(object, symbol)!.enumerable) {
         keys.push(symbol);
       }
-    });
+    }
   }
 
   return keys as Array<string>;
@@ -144,7 +146,7 @@ export function printIteratorValues(
  * without surrounding punctuation (for example, brackets)
  **/
 export function printListItems(
-  list: ArrayLike<unknown>,
+  list: ArrayLike<unknown> | DataView | ArrayBuffer,
   config: Config,
   indentation: string,
   depth: number,
@@ -152,13 +154,16 @@ export function printListItems(
   printer: Printer,
 ): string {
   let result = '';
+  list = list instanceof ArrayBuffer ? new DataView(list) : list;
+  const isDataView = (l: unknown): l is DataView => l instanceof DataView;
+  const length = isDataView(list) ? list.byteLength : list.length;
 
-  if (list.length) {
+  if (length > 0) {
     result += config.spacingOuter;
 
     const indentationNext = indentation + config.indent;
 
-    for (let i = 0; i < list.length; i++) {
+    for (let i = 0; i < length; i++) {
       result += indentationNext;
 
       if (i === config.maxWidth) {
@@ -166,11 +171,17 @@ export function printListItems(
         break;
       }
 
-      if (i in list) {
-        result += printer(list[i], config, indentationNext, depth, refs);
+      if (isDataView(list) || i in list) {
+        result += printer(
+          isDataView(list) ? list.getInt8(i) : list[i],
+          config,
+          indentationNext,
+          depth,
+          refs,
+        );
       }
 
-      if (i < list.length - 1) {
+      if (i < length - 1) {
         result += `,${config.spacingInner}`;
       } else if (!config.min) {
         result += ',';
@@ -199,7 +210,7 @@ export function printObjectProperties(
   let result = '';
   const keys = getKeysOfEnumerableProperties(val, config.compareKeys);
 
-  if (keys.length) {
+  if (keys.length > 0) {
     result += config.spacingOuter;
 
     const indentationNext = indentation + config.indent;

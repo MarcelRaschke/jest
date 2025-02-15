@@ -22,9 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-/* eslint-disable */
-
-import type {Tester} from './types';
+import type {Tester, TesterContext} from './types';
 
 export type EqualsFunction = (
   a: unknown,
@@ -44,8 +42,8 @@ function isAsymmetric(obj: any) {
 }
 
 function asymmetricMatch(a: any, b: any) {
-  var asymmetricA = isAsymmetric(a),
-    asymmetricB = isAsymmetric(b);
+  const asymmetricA = isAsymmetric(a);
+  const asymmetricB = isAsymmetric(b);
 
   if (asymmetricA && asymmetricB) {
     return undefined;
@@ -70,22 +68,23 @@ function eq(
   customTesters: Array<Tester>,
   strictCheck: boolean | undefined,
 ): boolean {
-  var result = true;
+  let result = true;
 
-  var asymmetricResult = asymmetricMatch(a, b);
+  const asymmetricResult = asymmetricMatch(a, b);
   if (asymmetricResult !== undefined) {
     return asymmetricResult;
   }
 
-  for (var i = 0; i < customTesters.length; i++) {
-    var customTesterResult = customTesters[i](a, b);
+  const testerContext: TesterContext = {equals};
+  for (const item of customTesters) {
+    const customTesterResult = item.call(testerContext, a, b, customTesters);
     if (customTesterResult !== undefined) {
       return customTesterResult;
     }
   }
 
   if (a instanceof Error && b instanceof Error) {
-    return a.message == b.message;
+    return a.message === b.message;
   }
 
   if (Object.is(a, b)) {
@@ -93,10 +92,10 @@ function eq(
   }
   // A strict comparison is necessary because `null == undefined`.
   if (a === null || b === null) {
-    return a === b;
+    return false;
   }
-  var className = Object.prototype.toString.call(a);
-  if (className != Object.prototype.toString.call(b)) {
+  const className = Object.prototype.toString.call(a);
+  if (className !== Object.prototype.toString.call(b)) {
     return false;
   }
   switch (className) {
@@ -108,7 +107,7 @@ function eq(
         return false;
       } else if (typeof a !== 'object' && typeof b !== 'object') {
         // both are proper primitives
-        return Object.is(a, b);
+        return false;
       } else {
         // both are `new Primitive()`s
         return Object.is(a.valueOf(), b.valueOf());
@@ -117,10 +116,13 @@ function eq(
       // Coerce dates to numeric primitive values. Dates are compared by their
       // millisecond representations. Note that invalid dates with millisecond representations
       // of `NaN` are not equivalent.
-      return +a == +b;
+      return +a === +b;
     // RegExps are compared by their source patterns and flags.
     case '[object RegExp]':
       return a.source === b.source && a.flags === b.flags;
+    // URLs are compared by their href property which contains the entire url string.
+    case '[object URL]':
+      return a.href === b.href;
   }
   if (typeof a !== 'object' || typeof b !== 'object') {
     return false;
@@ -132,7 +134,7 @@ function eq(
   }
 
   // Used to detect circular references.
-  var length = aStack.length;
+  let length = aStack.length;
   while (length--) {
     // Linear search. Performance is inversely proportional to the number of
     // unique nested structures.
@@ -149,24 +151,24 @@ function eq(
   bStack.push(b);
   // Recursively compare objects and arrays.
   // Compare array lengths to determine if a deep comparison is necessary.
-  if (strictCheck && className == '[object Array]' && a.length !== b.length) {
+  if (strictCheck && className === '[object Array]' && a.length !== b.length) {
     return false;
   }
 
   // Deep compare objects.
-  var aKeys = keys(a, hasKey),
-    key;
+  const aKeys = keys(a, hasKey);
+  let key;
 
-  var bKeys = keys(b, hasKey);
+  const bKeys = keys(b, hasKey);
   // Add keys corresponding to asymmetric matchers if they miss in non strict check mode
   if (!strictCheck) {
-    for (var index = 0; index !== bKeys.length; ++index) {
+    for (let index = 0; index !== bKeys.length; ++index) {
       key = bKeys[index];
       if ((isAsymmetric(b[key]) || b[key] === undefined) && !hasKey(a, key)) {
         aKeys.push(key);
       }
     }
-    for (var index = 0; index !== aKeys.length; ++index) {
+    for (let index = 0; index !== aKeys.length; ++index) {
       key = aKeys[index];
       if ((isAsymmetric(a[key]) || a[key] === undefined) && !hasKey(b, key)) {
         bKeys.push(key);
@@ -175,7 +177,7 @@ function eq(
   }
 
   // Ensure that both objects contain the same number of properties before comparing deep equality.
-  var size = aKeys.length;
+  let size = aKeys.length;
   if (bKeys.length !== size) {
     return false;
   }
@@ -205,27 +207,26 @@ function eq(
 }
 
 function keys(obj: object, hasKey: (obj: object, key: string) => boolean) {
-  var keys = [];
-  for (var key in obj) {
+  const keys = [];
+  for (const key in obj) {
     if (hasKey(obj, key)) {
       keys.push(key);
     }
   }
-  return keys.concat(
-    (Object.getOwnPropertySymbols(obj) as Array<any>).filter(
-      symbol =>
-        (Object.getOwnPropertyDescriptor(obj, symbol) as PropertyDescriptor)
-          .enumerable,
+  return [
+    ...keys,
+    ...Object.getOwnPropertySymbols(obj).filter(
+      symbol => Object.getOwnPropertyDescriptor(obj, symbol)!.enumerable,
     ),
-  );
+  ];
 }
 
-function hasKey(obj: any, key: string) {
+function hasKey(obj: any, key: string | symbol) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-export function isA(typeName: string, value: unknown) {
-  return Object.prototype.toString.apply(value) === '[object ' + typeName + ']';
+export function isA<T>(typeName: string, value: unknown): value is T {
+  return Object.prototype.toString.apply(value) === `[object ${typeName}]`;
 }
 
 function isDomNode(obj: any): boolean {
@@ -235,42 +236,5 @@ function isDomNode(obj: any): boolean {
     typeof obj.nodeType === 'number' &&
     typeof obj.nodeName === 'string' &&
     typeof obj.isEqualNode === 'function'
-  );
-}
-
-// SENTINEL constants are from https://github.com/immutable-js/immutable-js/tree/main/src/predicates
-const IS_KEYED_SENTINEL = '@@__IMMUTABLE_KEYED__@@';
-const IS_SET_SENTINEL = '@@__IMMUTABLE_SET__@@';
-const IS_LIST_SENTINEL = '@@__IMMUTABLE_LIST__@@';
-const IS_ORDERED_SENTINEL = '@@__IMMUTABLE_ORDERED__@@';
-
-export function isImmutableUnorderedKeyed(maybeKeyed: any) {
-  return !!(
-    maybeKeyed &&
-    maybeKeyed[IS_KEYED_SENTINEL] &&
-    !maybeKeyed[IS_ORDERED_SENTINEL]
-  );
-}
-
-export function isImmutableUnorderedSet(maybeSet: any) {
-  return !!(
-    maybeSet &&
-    maybeSet[IS_SET_SENTINEL] &&
-    !maybeSet[IS_ORDERED_SENTINEL]
-  );
-}
-
-export function isImmutableList(maybeList: any) {
-  return !!(
-    maybeList &&
-    maybeList[IS_LIST_SENTINEL]
-  );
-}
-
-export function isImmutableOrderedKeyed(maybeKeyed: any) {
-  return !!(
-    maybeKeyed &&
-    maybeKeyed[IS_KEYED_SENTINEL] &&
-    maybeKeyed[IS_ORDERED_SENTINEL]
   );
 }

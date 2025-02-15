@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,8 +7,8 @@
 
 import {dirname, normalize, resolve} from 'path';
 import {fileURLToPath} from 'url';
-import glob from 'glob';
-import rimraf from 'rimraf';
+import {glob} from 'glob';
+import fs from 'graceful-fs';
 
 const excludedModules = [
   'e2e/global-setup-node-modules/node_modules/',
@@ -29,6 +29,6 @@ const e2eNodeModules = glob.sync('e2e/{*,*/*}/node_modules/', {
   ignore: excludedModules,
 });
 
-e2eNodeModules.forEach(dir => {
-  rimraf.sync(dir, {glob: false});
-});
+for (const dir of e2eNodeModules) {
+  fs.rmSync(dir, {force: true, recursive: true});
+}

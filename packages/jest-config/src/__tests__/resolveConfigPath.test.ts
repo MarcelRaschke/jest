@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -19,7 +19,7 @@ const MULTIPLE_CONFIGS_ERROR_PATTERN = /Multiple configurations found/;
 beforeEach(() => cleanup(DIR));
 afterEach(() => cleanup(DIR));
 
-describe.each(JEST_CONFIG_EXT_ORDER.slice(0))(
+describe.each([...JEST_CONFIG_EXT_ORDER])(
   'Resolve config path %s',
   extension => {
     test(`file path with "${extension}"`, () => {
@@ -32,7 +32,7 @@ describe.each(JEST_CONFIG_EXT_ORDER.slice(0))(
       expect(resolveConfigPath(absoluteConfigPath, DIR)).toBe(
         absoluteConfigPath,
       );
-      expect(() => resolveConfigPath('/does_not_exist', DIR)).toThrowError(
+      expect(() => resolveConfigPath('/does_not_exist', DIR)).toThrow(
         NO_ROOT_DIR_ERROR_PATTERN,
       );
 
@@ -40,7 +40,7 @@ describe.each(JEST_CONFIG_EXT_ORDER.slice(0))(
       expect(resolveConfigPath(relativeConfigPath, DIR)).toBe(
         absoluteConfigPath,
       );
-      expect(() => resolveConfigPath('does_not_exist', DIR)).toThrowError(
+      expect(() => resolveConfigPath('does_not_exist', DIR)).toThrow(
         NO_ROOT_DIR_ERROR_PATTERN,
       );
     });
@@ -60,12 +60,12 @@ describe.each(JEST_CONFIG_EXT_ORDER.slice(0))(
       expect(() =>
         // absolute
         resolveConfigPath(path.dirname(absoluteJestConfigPath), DIR),
-      ).toThrowError(ERROR_PATTERN);
+      ).toThrow(ERROR_PATTERN);
 
       expect(() =>
         // relative
         resolveConfigPath(path.dirname(relativeJestConfigPath), DIR),
-      ).toThrowError(ERROR_PATTERN);
+      ).toThrow(ERROR_PATTERN);
 
       writeFiles(DIR, {[relativePackageJsonPath]: ''});
 
@@ -98,29 +98,93 @@ describe.each(JEST_CONFIG_EXT_ORDER.slice(0))(
       // absolute
       expect(() =>
         resolveConfigPath(path.dirname(absolutePackageJsonPath), DIR),
-      ).toThrowError(MULTIPLE_CONFIGS_ERROR_PATTERN);
+      ).toThrow(MULTIPLE_CONFIGS_ERROR_PATTERN);
 
       // relative
       expect(() =>
         resolveConfigPath(path.dirname(relativePackageJsonPath), DIR),
-      ).toThrowError(MULTIPLE_CONFIGS_ERROR_PATTERN);
+      ).toThrow(MULTIPLE_CONFIGS_ERROR_PATTERN);
 
       expect(() => {
         resolveConfigPath(
           path.join(path.dirname(relativePackageJsonPath), 'j/x/b/m/'),
           DIR,
         );
-      }).toThrowError(NO_ROOT_DIR_ERROR_PATTERN);
+      }).toThrow(NO_ROOT_DIR_ERROR_PATTERN);
+    });
+
+    test('file path from "jest" key', () => {
+      const anyFileName = `anyJestConfigfile${extension}`;
+      const relativePackageJsonPath = 'a/b/c/package.json';
+      const relativeAnyFilePath = `a/b/c/conf/${anyFileName}`;
+      const absolutePackageJsonPath = path.resolve(
+        DIR,
+        relativePackageJsonPath,
+      );
+      const absoluteAnyFilePath = path.resolve(DIR, relativeAnyFilePath);
+
+      writeFiles(DIR, {
+        'a/b/c/package.json': `{ "jest": "conf/${anyFileName}" }`,
+      });
+      writeFiles(DIR, {[relativeAnyFilePath]: ''});
+
+      const result = resolveConfigPath(
+        path.dirname(absolutePackageJsonPath),
+        DIR,
+      );
+
+      expect(result).toBe(absoluteAnyFilePath);
+    });
+
+    test('not a file path from "jest" key', () => {
+      const anyFileName = `anyJestConfigfile${extension}`;
+      const relativePackageJsonPath = 'a/b/c/package.json';
+      const relativeAnyFilePath = `a/b/c/conf/${anyFileName}`;
+      const absolutePackageJsonPath = path.resolve(
+        DIR,
+        relativePackageJsonPath,
+      );
+
+      writeFiles(DIR, {
+        'a/b/c/package.json': '{ "jest": {"verbose": true} }',
+      });
+      writeFiles(DIR, {[relativeAnyFilePath]: ''});
+
+      const result = resolveConfigPath(
+        path.dirname(absolutePackageJsonPath),
+        DIR,
+      );
+
+      expect(result).toBe(absolutePackageJsonPath);
+    });
+
+    test('not a valid file when "jest" key is a path', () => {
+      const anyFileName = `anyJestConfigfile${extension}`;
+      const relativePackageJsonPath = 'a/b/c/package.json';
+      const relativeAnyFilePath = `a/b/c/conf/${anyFileName}`;
+      const absolutePackageJsonPath = path.resolve(
+        DIR,
+        relativePackageJsonPath,
+      );
+
+      writeFiles(DIR, {
+        'a/b/c/package.json': '{ "jest": "conf/nonExistentConfigfile.json" }',
+      });
+      writeFiles(DIR, {[relativeAnyFilePath]: ''});
+
+      expect(() =>
+        resolveConfigPath(path.dirname(absolutePackageJsonPath), DIR),
+      ).toThrow(
+        /Jest expects the string configuration to point to a file, but .* not\./,
+      );
     });
   },
 );
 
 const pickPairsWithSameOrder = <T>(array: ReadonlyArray<T>) =>
-  array
-    .map((value1, idx, arr) =>
-      arr.slice(idx + 1).map(value2 => [value1, value2]),
-    )
-    .flat();
+  array.flatMap((value1, idx, arr) =>
+    arr.slice(idx + 1).map(value2 => [value1, value2]),
+  );
 
 test('pickPairsWithSameOrder', () => {
   expect(pickPairsWithSameOrder([1, 2, 3])).toStrictEqual([
@@ -146,7 +210,7 @@ describe.each(pickPairsWithSameOrder(JEST_CONFIG_EXT_ORDER))(
 
       expect(() =>
         resolveConfigPath(path.dirname(relativeJestConfigPaths[0]), DIR),
-      ).toThrowError(MULTIPLE_CONFIGS_ERROR_PATTERN);
+      ).toThrow(MULTIPLE_CONFIGS_ERROR_PATTERN);
     });
   },
 );

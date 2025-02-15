@@ -1,21 +1,23 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
  */
 
-import deepCyclicCopyReplaceable from '../deepCyclicCopyReplaceable';
+import deepCyclicCopyReplaceable, {
+  SERIALIZABLE_PROPERTIES,
+} from '../deepCyclicCopyReplaceable';
 
 test('returns the same value for primitive or function values', () => {
   const fn = () => {};
 
-  expect(deepCyclicCopyReplaceable(undefined)).toBe(undefined);
-  expect(deepCyclicCopyReplaceable(null)).toBe(null);
+  expect(deepCyclicCopyReplaceable(undefined)).toBeUndefined();
+  expect(deepCyclicCopyReplaceable(null)).toBeNull();
   expect(deepCyclicCopyReplaceable(true)).toBe(true);
   expect(deepCyclicCopyReplaceable(42)).toBe(42);
-  expect(Number.isNaN(deepCyclicCopyReplaceable(NaN))).toBe(true);
+  expect(Number.isNaN(deepCyclicCopyReplaceable(Number.NaN))).toBe(true);
   expect(deepCyclicCopyReplaceable('foo')).toBe('foo');
   expect(deepCyclicCopyReplaceable(fn)).toBe(fn);
 });
@@ -43,7 +45,7 @@ test('convert accessor descriptor into value descriptor', () => {
   });
 });
 
-test('should not skips non-enumerables', () => {
+test('should not skip non-enumerables', () => {
   const obj = {};
   Object.defineProperty(obj, 'foo', {enumerable: false, value: 'bar'});
 
@@ -64,6 +66,18 @@ test('copies symbols', () => {
   const obj = {[symbol]: 42};
 
   expect(deepCyclicCopyReplaceable(obj)[symbol]).toBe(42);
+});
+
+test('copies value of inherited getters', () => {
+  class Foo {
+    #foo = 42;
+    get foo() {
+      return this.#foo;
+    }
+  }
+  const obj = new Foo();
+
+  expect(deepCyclicCopyReplaceable(obj).foo).toBe(42);
 });
 
 test('copies arrays as array objects', () => {
@@ -137,5 +151,26 @@ test('should set writable, configurable to true', () => {
   const copied = deepCyclicCopyReplaceable(a);
   expect(Object.getOwnPropertyDescriptors(copied)).toEqual({
     key: {configurable: true, enumerable: true, value: 1, writable: true},
+  });
+});
+
+test('should only copy the properties mapped to be serializable', () => {
+  class Foo {
+    foo = 'foo';
+    bar = ['bar'];
+    get baz() {
+      throw new Error('should not call getter');
+    }
+  }
+
+  // @ts-expect-error: Testing purpose
+  Foo.prototype[SERIALIZABLE_PROPERTIES] = ['foo', 'bar'];
+
+  const obj = new Foo();
+
+  const copied = deepCyclicCopyReplaceable(obj);
+  expect(Object.getOwnPropertyDescriptors(copied)).toEqual({
+    bar: {configurable: true, enumerable: true, value: ['bar'], writable: true},
+    foo: {configurable: true, enumerable: true, value: 'foo', writable: true},
   });
 });

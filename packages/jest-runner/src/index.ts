@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,7 @@
 
 import chalk = require('chalk');
 import Emittery = require('emittery');
-import throat from 'throat';
+import pLimit = require('p-limit');
 import type {
   Test,
   TestEvents,
@@ -16,10 +16,18 @@ import type {
 } from '@jest/test-result';
 import {deepCyclicCopy} from 'jest-util';
 import type {TestWatcher} from 'jest-watcher';
-import {JestWorkerFarm, PromiseWithCustomMessage, Worker} from 'jest-worker';
+import {
+  type JestWorkerFarm,
+  type PromiseWithCustomMessage,
+  Worker,
+} from 'jest-worker';
 import runTest from './runTest';
 import type {SerializableResolver} from './testWorker';
-import {EmittingTestRunner, TestRunnerOptions, UnsubscribeFn} from './types';
+import {
+  EmittingTestRunner,
+  type TestRunnerOptions,
+  type UnsubscribeFn,
+} from './types';
 
 export type {Test, TestEvents} from '@jest/test-result';
 export type {Config} from '@jest/types';
@@ -47,14 +55,14 @@ export default class TestRunner extends EmittingTestRunner {
     watcher: TestWatcher,
     options: TestRunnerOptions,
   ): Promise<void> {
-    return await (options.serial
+    return options.serial
       ? this.#createInBandTestRun(tests, watcher)
-      : this.#createParallelTestRun(tests, watcher));
+      : this.#createParallelTestRun(tests, watcher);
   }
 
   async #createInBandTestRun(tests: Array<Test>, watcher: TestWatcher) {
     process.env.JEST_WORKER_ID = '1';
-    const mutex = throat(1);
+    const mutex = pLimit(1);
     return tests.reduce(
       (promise, test) =>
         mutex(() =>
@@ -64,13 +72,6 @@ export default class TestRunner extends EmittingTestRunner {
                 throw new CancelRun();
               }
 
-              // `deepCyclicCopy` used here to avoid mem-leak
-              const sendMessageToJest: TestFileEvent = (eventName, args) =>
-                this.#eventEmitter.emit(
-                  eventName,
-                  deepCyclicCopy(args, {keepPrototype: false}),
-                );
-
               await this.#eventEmitter.emit('test-file-start', [test]);
 
               return runTest(
@@ -79,7 +80,7 @@ export default class TestRunner extends EmittingTestRunner {
                 test.context.config,
                 test.context.resolver,
                 this._context,
-                sendMessageToJest,
+                this.#sendMessageToJest,
               );
             })
             .then(
@@ -94,7 +95,7 @@ export default class TestRunner extends EmittingTestRunner {
   }
 
   async #createParallelTestRun(tests: Array<Test>, watcher: TestWatcher) {
-    const resolvers: Map<string, SerializableResolver> = new Map();
+    const resolvers = new Map<string, SerializableResolver>();
     for (const test of tests) {
       if (!resolvers.has(test.context.config.id)) {
         resolvers.set(test.context.config.id, {
@@ -105,25 +106,32 @@ export default class TestRunner extends EmittingTestRunner {
     }
 
     const worker = new Worker(require.resolve('./testWorker'), {
+      enableWorkerThreads: this._globalConfig.workerThreads,
       exposedMethods: ['worker'],
-      // @ts-expect-error: option does not exist on the node 12 types
       forkOptions: {serialization: 'json', stdio: 'pipe'},
+      // The workerIdleMemoryLimit should've been converted to a number during
+      // the normalization phase.
+      idleMemoryLimit:
+        typeof this._globalConfig.workerIdleMemoryLimit === 'number'
+          ? this._globalConfig.workerIdleMemoryLimit
+          : undefined,
       maxRetries: 3,
       numWorkers: this._globalConfig.maxWorkers,
-      setupArgs: [{serializableResolvers: Array.from(resolvers.values())}],
+      setupArgs: [{serializableResolvers: [...resolvers.values()]}],
     }) as JestWorkerFarm<TestWorker>;
 
     if (worker.getStdout()) worker.getStdout().pipe(process.stdout);
     if (worker.getStderr()) worker.getStderr().pipe(process.stderr);
 
-    const mutex = throat(this._globalConfig.maxWorkers);
+    const mutex = pLimit(this._globalConfig.maxWorkers);
 
     // Send test suites to workers continuously instead of all at once to track
     // the start time of individual tests.
     const runTestInWorker = (test: Test) =>
       mutex(async () => {
         if (watcher.isInterrupted()) {
-          return Promise.reject();
+          // eslint-disable-next-line unicorn/error-message
+          throw new Error();
         }
 
         await this.#eventEmitter.emit('test-file-start', [test]);
@@ -132,12 +140,13 @@ export default class TestRunner extends EmittingTestRunner {
           config: test.context.config,
           context: {
             ...this._context,
-            changedFiles:
-              this._context.changedFiles &&
-              Array.from(this._context.changedFiles),
-            sourcesRelatedToTestsInChangedFiles:
-              this._context.sourcesRelatedToTestsInChangedFiles &&
-              Array.from(this._context.sourcesRelatedToTestsInChangedFiles),
+            changedFiles: this._context.changedFiles && [
+              ...this._context.changedFiles,
+            ],
+            sourcesRelatedToTestsInChangedFiles: this._context
+              .sourcesRelatedToTestsInChangedFiles && [
+              ...this._context.sourcesRelatedToTestsInChangedFiles,
+            ],
           },
           globalConfig: this._globalConfig,
           path: test.path,
@@ -153,7 +162,7 @@ export default class TestRunner extends EmittingTestRunner {
         return promise;
       });
 
-    const onInterrupt = new Promise((_, reject) => {
+    const onInterrupt = new Promise((_resolve, reject) => {
       watcher.on('change', state => {
         if (state.interrupted) {
           reject(new CancelRun());
@@ -194,6 +203,14 @@ export default class TestRunner extends EmittingTestRunner {
   ): UnsubscribeFn {
     return this.#eventEmitter.on(eventName, listener);
   }
+
+  #sendMessageToJest: TestFileEvent = async (eventName, args) => {
+    await this.#eventEmitter.emit(
+      eventName,
+      // `deepCyclicCopy` used here to avoid mem-leak
+      deepCyclicCopy(args, {keepPrototype: false}),
+    );
+  };
 }
 
 class CancelRun extends Error {

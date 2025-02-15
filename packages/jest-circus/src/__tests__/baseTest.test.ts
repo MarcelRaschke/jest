@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -37,6 +37,47 @@ test('failures', () => {
       afterEach(() => { throw new Error('banana')});
       test('one', () => { throw new Error('kentucky')});
       test('two', () => {});
+    })
+  `);
+
+  expect(stdout).toMatchSnapshot();
+});
+
+test('concurrent', () => {
+  const {stdout} = runTest(`
+    describe('describe', () => {
+      beforeEach(() => {});
+      afterEach(() => { throw new Error('banana')});
+      test.concurrent('one', () => { 
+        console.log('hello one');
+        throw new Error('kentucky')
+      });
+      test.concurrent('two', () => {
+        console.log('hello two');
+      });
+      test.concurrent('three', async () => { 
+        console.log('hello three');
+        await Promise.resolve(); 
+      });
+    })
+  `);
+
+  expect(stdout).toMatchSnapshot();
+});
+
+test('concurrent.each', () => {
+  const {stdout} = runTest(`
+    describe('describe', () => {
+      beforeEach(() => {});
+      afterEach(() => { throw new Error('banana')});
+      test.concurrent.each([
+        ['one'],
+        ['two'],
+        ['three'],
+      ])('%s', async (name) => {
+        console.log('hello %s', name);
+        await Promise.resolve(); 
+      });
     })
   `);
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -17,7 +17,7 @@ type ResolveOptions = {
   optional?: boolean;
 };
 
-export const BULLET: string = chalk.bold('\u25cf ');
+export const BULLET: string = chalk.bold('\u25CF ');
 export const DOCUMENTATION_NOTE = `  ${chalk.bold(
   'Configuration Documentation:',
 )}
@@ -48,23 +48,23 @@ export const resolve = (
     );
   }
   /// can cast as string since nulls will be thrown
-  return module as string;
+  return module!;
 };
 
 export const escapeGlobCharacters = (path: string): string =>
-  path.replace(/([()*{}[\]!?\\])/g, '\\$1');
+  path.replaceAll(/([!()*?[\\\]{}])/g, '\\$1');
 
 export const replaceRootDirInPath = (
   rootDir: string,
   filePath: string,
 ): string => {
-  if (!/^<rootDir>/.test(filePath)) {
+  if (!filePath.startsWith('<rootDir>')) {
     return filePath;
   }
 
   return path.resolve(
     rootDir,
-    path.normalize(`./${filePath.substring('<rootDir>'.length)}`),
+    path.normalize(`./${filePath.slice('<rootDir>'.length)}`),
   );
 };
 
@@ -106,10 +106,7 @@ export const _replaceRootDirTags = <T extends ReplaceRootDirConfigValues>(
         return config;
       }
 
-      return _replaceRootDirInObject(
-        rootDir,
-        config as ReplaceRootDirConfigObj,
-      ) as T;
+      return _replaceRootDirInObject(rootDir, config) as T;
     case 'string':
       return replaceRootDirInPath(rootDir, config) as T;
   }

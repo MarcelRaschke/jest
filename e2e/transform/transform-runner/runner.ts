@@ -1,12 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import throat from 'throat';
-import {Test, TestResult, createEmptyTestResult} from '@jest/test-result';
+import pLimit from 'p-limit';
+import {
+  type Test,
+  type TestResult,
+  createEmptyTestResult,
+} from '@jest/test-result';
 import type {Config} from '@jest/types';
 import type {
   OnTestFailure,
@@ -32,7 +36,7 @@ export default class BaseTestRunner {
     onResult: OnTestSuccess,
     onFailure: OnTestFailure,
   ): Promise<void> {
-    const mutex = throat(1);
+    const mutex = pLimit(1);
     return tests.reduce(
       (promise, test) =>
         mutex(() =>
@@ -59,7 +63,7 @@ export default class BaseTestRunner {
               };
             })
             .then(result => onResult(test, result))
-            .catch(err => onFailure(test, err)),
+            .catch(error => onFailure(test, error)),
         ),
       Promise.resolve(),
     );

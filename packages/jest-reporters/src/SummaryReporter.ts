@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -12,14 +12,11 @@ import type {
   TestContext,
 } from '@jest/test-result';
 import type {Config} from '@jest/types';
-import {testPathPatternToRegExp} from 'jest-util';
 import BaseReporter from './BaseReporter';
 import getResultHeader from './getResultHeader';
 import getSnapshotSummary from './getSnapshotSummary';
 import getSummary from './getSummary';
 import type {ReporterOnStartOptions} from './types';
-
-const TEST_SUMMARY_THRESHOLD = 20;
 
 const NPM_EVENTS = new Set([
   'prepublish',
@@ -51,16 +48,35 @@ const NPM_EVENTS = new Set([
 const {npm_config_user_agent, npm_lifecycle_event, npm_lifecycle_script} =
   process.env;
 
+export type SummaryReporterOptions = {
+  summaryThreshold?: number;
+};
+
 export default class SummaryReporter extends BaseReporter {
   private _estimatedTime: number;
-  private _globalConfig: Config.GlobalConfig;
+  private readonly _globalConfig: Config.GlobalConfig;
+  private readonly _summaryThreshold: number;
 
   static readonly filename = __filename;
 
-  constructor(globalConfig: Config.GlobalConfig) {
+  constructor(
+    globalConfig: Config.GlobalConfig,
+    options?: SummaryReporterOptions,
+  ) {
     super();
     this._globalConfig = globalConfig;
     this._estimatedTime = 0;
+    this._validateOptions(options);
+    this._summaryThreshold = options?.summaryThreshold ?? 20;
+  }
+
+  private _validateOptions(options?: SummaryReporterOptions) {
+    if (
+      options?.summaryThreshold &&
+      typeof options.summaryThreshold !== 'number'
+    ) {
+      throw new TypeError('The option summaryThreshold should be a number');
+    }
   }
 
   // If we write more than one character at a time it is possible that
@@ -88,7 +104,7 @@ export default class SummaryReporter extends BaseReporter {
   ): void {
     const {numTotalTestSuites, testResults, wasInterrupted} = aggregatedResults;
     if (numTotalTestSuites) {
-      const lastResult = testResults[testResults.length - 1];
+      const lastResult = testResults.at(-1);
       // Print a newline if the last test did not fail to line up newlines
       // similar to when an error would have been thrown in the test.
       if (
@@ -106,20 +122,20 @@ export default class SummaryReporter extends BaseReporter {
         this._globalConfig,
       );
 
-      if (numTotalTestSuites) {
-        let message = getSummary(aggregatedResults, {
-          estimatedTime: this._estimatedTime,
-        });
+      let message = getSummary(aggregatedResults, {
+        estimatedTime: this._estimatedTime,
+        seed: this._globalConfig.seed,
+        showSeed: this._globalConfig.showSeed,
+      });
 
-        if (!this._globalConfig.silent) {
-          message += `\n${
-            wasInterrupted
-              ? chalk.bold.red('Test run was interrupted.')
-              : this._getTestSummary(testContexts, this._globalConfig)
-          }`;
-        }
-        this.log(message);
+      if (!this._globalConfig.silent) {
+        message += `\n${
+          wasInterrupted
+            ? chalk.bold.red('Test run was interrupted.')
+            : this._getTestSummary(testContexts, this._globalConfig)
+        }`;
       }
+      this.log(message);
     }
   }
 
@@ -160,7 +176,7 @@ export default class SummaryReporter extends BaseReporter {
         globalConfig,
         updateCommand,
       );
-      snapshotSummary.forEach(this.log);
+      for (const summary of snapshotSummary) this.log(summary);
 
       this.log(''); // print empty line
     }
@@ -176,17 +192,17 @@ export default class SummaryReporter extends BaseReporter {
     const runtimeErrors = aggregatedResults.numRuntimeErrorTestSuites;
     if (
       failedTests + runtimeErrors > 0 &&
-      aggregatedResults.numTotalTestSuites > TEST_SUMMARY_THRESHOLD
+      aggregatedResults.numTotalTestSuites > this._summaryThreshold
     ) {
       this.log(chalk.bold('Summary of all failing tests'));
-      aggregatedResults.testResults.forEach(testResult => {
+      for (const testResult of aggregatedResults.testResults) {
         const {failureMessage} = testResult;
         if (failureMessage) {
           this._write(
             `${getResultHeader(testResult, globalConfig)}\n${failureMessage}\n`,
           );
         }
-      });
+      }
       this.log(''); // print empty line
     }
   }
@@ -195,15 +211,14 @@ export default class SummaryReporter extends BaseReporter {
     testContexts: Set<TestContext>,
     globalConfig: Config.GlobalConfig,
   ) {
+    const testPathPatterns = globalConfig.testPathPatterns;
+
     const getMatchingTestsInfo = () => {
       const prefix = globalConfig.findRelatedTests
         ? ' related to files matching '
         : ' matching ';
 
-      return (
-        chalk.dim(prefix) +
-        testPathPatternToRegExp(globalConfig.testPathPattern).toString()
-      );
+      return chalk.dim(prefix) + testPathPatterns.toPretty();
     };
 
     let testInfo = '';
@@ -212,7 +227,7 @@ export default class SummaryReporter extends BaseReporter {
       testInfo = chalk.dim(' within paths');
     } else if (globalConfig.onlyChanged) {
       testInfo = chalk.dim(' related to changed files');
-    } else if (globalConfig.testPathPattern) {
+    } else if (testPathPatterns.isSet()) {
       testInfo = getMatchingTestsInfo();
     }
 

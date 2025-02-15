@@ -7,7 +7,13 @@ exports[`prints the config object 1`] = `
     "cache": false,
     "cacheDirectory": "/test_cache_dir/",
     "clearMocks": false,
+    "collectCoverageFrom": [
+      "src",
+      "!public"
+    ],
+    "coverageDirectory": "coverage",
     "coveragePathIgnorePatterns": [],
+    "coverageReporters": [],
     "cwd": "/test_root_dir/",
     "detectLeaks": false,
     "detectOpenHandles": false,
@@ -28,7 +34,18 @@ exports[`prints the config object 1`] = `
     "moduleNameMapper": [],
     "modulePathIgnorePatterns": [],
     "modulePaths": [],
+    "openHandlesTimeout": 1000,
     "prettierPath": "prettier",
+    "reporters": [
+      "default",
+      "custom-reporter-1",
+      [
+        "custom-reporter-2",
+        {
+          "configValue": true
+        }
+      ]
+    ],
     "resetMocks": false,
     "resetModules": false,
     "restoreMocks": false,
@@ -55,8 +72,10 @@ exports[`prints the config object 1`] = `
       "\\\\.test\\\\.js$"
     ],
     "testRunner": "myRunner",
+    "testTimeout": 5000,
     "transform": [],
     "transformIgnorePatterns": [],
+    "waitNextEventLoopTurnForUnhandledRejectionEvents": false,
     "watchPathIgnorePatterns": []
   },
   "globalConfig": {
@@ -90,22 +109,26 @@ exports[`prints the config object 1`] = `
     "notifyMode": "failure-change",
     "onlyChanged": false,
     "onlyFailures": false,
+    "openHandlesTimeout": 1000,
     "passWithNoTests": false,
     "projects": [],
     "reporters": [],
     "rootDir": "/test_root_dir/",
+    "runInBand": false,
     "runTestsByPath": false,
+    "seed": 1234,
     "silent": false,
     "skipFilter": false,
     "snapshotFormat": {},
     "testFailureExitCode": 1,
     "testNamePattern": "",
-    "testPathPattern": "",
+    "testPathPatterns": [],
     "testSequencer": "@jest/test-sequencer",
     "testTimeout": 5000,
     "updateSnapshot": "none",
     "useStderr": false,
     "verbose": false,
+    "waitNextEventLoopTurnForUnhandledRejectionEvents": false,
     "watch": true,
     "watchAll": false,
     "watchPlugins": [],

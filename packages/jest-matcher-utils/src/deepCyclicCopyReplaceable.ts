@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -28,6 +28,10 @@ if (typeof Buffer !== 'undefined') {
   builtInObject.push(Buffer);
 }
 
+export const SERIALIZABLE_PROPERTIES = Symbol.for(
+  '@jest/serializableProperties',
+);
+
 const isBuiltInObject = (object: any) =>
   builtInObject.includes(object.constructor);
 
@@ -36,7 +40,7 @@ const isMap = (value: any): value is Map<unknown, unknown> =>
 
 export default function deepCyclicCopyReplaceable<T>(
   value: T,
-  cycles: WeakMap<any, any> = new WeakMap(),
+  cycles = new WeakMap<any, any>(),
 ): T {
   if (typeof value !== 'object' || value === null) {
     return value;
@@ -57,9 +61,31 @@ export default function deepCyclicCopyReplaceable<T>(
 
 function deepCyclicCopyObject<T>(object: T, cycles: WeakMap<any, unknown>): T {
   const newObject = Object.create(Object.getPrototypeOf(object));
-  const descriptors: {
-    [x: string]: PropertyDescriptor;
-  } = Object.getOwnPropertyDescriptors(object);
+  let descriptors: Record<string | symbol, PropertyDescriptor> = {};
+  let obj = object;
+  do {
+    const serializableProperties = getSerializableProperties(obj);
+
+    if (serializableProperties === undefined) {
+      descriptors = Object.assign(
+        {},
+        Object.getOwnPropertyDescriptors(obj),
+        descriptors,
+      );
+    } else {
+      for (const property of serializableProperties) {
+        if (!descriptors[property]) {
+          descriptors[property] = Object.getOwnPropertyDescriptor(
+            obj,
+            property,
+          )!;
+        }
+      }
+    }
+  } while (
+    (obj = Object.getPrototypeOf(obj)) &&
+    obj !== Object.getPrototypeOf({})
+  );
 
   cycles.set(object, newObject);
 
@@ -116,9 +142,30 @@ function deepCyclicCopyMap<T>(
 
   cycles.set(map, newMap);
 
-  map.forEach((value, key) => {
+  for (const [key, value] of map) {
     newMap.set(key, deepCyclicCopyReplaceable(value, cycles));
-  });
+  }
 
   return newMap as any;
+}
+
+function getSerializableProperties<T>(
+  obj: T,
+): Array<string | symbol> | undefined {
+  if (typeof obj !== 'object' || obj === null) {
+    return;
+  }
+
+  const serializableProperties: unknown = (obj as Record<string | symbol, any>)[
+    SERIALIZABLE_PROPERTIES
+  ];
+
+  if (!Array.isArray(serializableProperties)) {
+    return;
+  }
+
+  return serializableProperties.filter(
+    (key): key is string | symbol =>
+      typeof key === 'string' || typeof key === 'symbol',
+  );
 }

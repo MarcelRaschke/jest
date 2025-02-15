@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -114,7 +114,7 @@ const dedentMarkup = (input: Array<string>, output: Array<string>): boolean => {
         return false; // because text has more than one adjacent line
       }
 
-      const indentationLengthOfTag = stack[stack.length - 1];
+      const indentationLengthOfTag = stack.at(-1)!;
       output.push(line.slice(indentationLengthOfTag + 2));
       isText = true;
     }

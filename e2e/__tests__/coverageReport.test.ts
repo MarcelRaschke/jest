@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -72,7 +72,7 @@ test('collects coverage only from specified files avoiding dependencies', () => 
     [
       '--no-cache',
       '--coverage',
-      '--collectCoverageOnlyFrom',
+      '--collectCoverageFrom',
       'sum.js',
       '--',
       'sum.test.js',
@@ -164,9 +164,9 @@ test('collects coverage from duplicate files avoiding shared cache', () => {
     // Ensure the exitCode is non-zero if super edge case with coverage triggers
     '--coverageThreshold',
     '{"global": {"lines": 100}}',
-    '--collectCoverageOnlyFrom',
+    '--collectCoverageFrom',
     'cached-duplicates/a/identical.js',
-    '--collectCoverageOnlyFrom',
+    '--collectCoverageFrom',
     'cached-duplicates/b/identical.js',
     '--',
     'identical.test.js',

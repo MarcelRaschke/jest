@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -63,8 +63,8 @@ export default function globsToMatcher(globs: Array<string>): Matcher {
     let kept = undefined;
     let negatives = 0;
 
-    for (let i = 0; i < matchers.length; i++) {
-      const {isMatch, negated} = matchers[i];
+    for (const matcher of matchers) {
+      const {isMatch, negated} = matcher;
 
       if (negated) {
         negatives++;
