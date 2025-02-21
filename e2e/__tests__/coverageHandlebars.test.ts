@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -25,7 +25,7 @@ it('code coverage for Handlebars', () => {
   expect(result.stdout).toMatchSnapshot();
 
   const coverageMapFile = path.join(coverageDir, 'coverage-final.json');
-  const coverageMap = JSON.parse(readFileSync(coverageMapFile, 'utf-8'));
+  const coverageMap = JSON.parse(readFileSync(coverageMapFile, 'utf8'));
 
   expect(
     Object.keys(coverageMap).map(filename => path.basename(filename)),

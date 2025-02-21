@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -13,7 +13,7 @@ const DIR = path.resolve(__dirname, '../no-tests-found-test');
 describe('No tests are found', () => {
   test('fails the test suite in standard situation', () => {
     const {exitCode, stdout} = runJest(DIR, [
-      '--testPathPattern',
+      '--testPathPatterns',
       '/non/existing/path/',
     ]);
 
@@ -26,7 +26,7 @@ describe('No tests are found', () => {
 
   test("doesn't fail the test suite if --passWithNoTests passed", () => {
     const {exitCode, stdout} = runJest(DIR, [
-      '--testPathPattern',
+      '--testPathPatterns',
       '/non/existing/path/',
       '--passWithNoTests',
     ]);

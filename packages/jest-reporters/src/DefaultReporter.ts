@@ -1,10 +1,11 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
+import type {WriteStream} from 'tty';
 import chalk = require('chalk');
 import {getConsoleOutput} from '@jest/console';
 import type {
@@ -26,18 +27,18 @@ import getResultHeader from './getResultHeader';
 import getSnapshotStatus from './getSnapshotStatus';
 import type {ReporterOnStartOptions} from './types';
 
-type write = NodeJS.WriteStream['write'];
+type write = WriteStream['write'];
 type FlushBufferedOutput = () => void;
 
-const TITLE_BULLET = chalk.bold('\u25cf ');
+const TITLE_BULLET = chalk.bold('\u25CF ');
 
 export default class DefaultReporter extends BaseReporter {
   private _clear: string; // ANSI clear sequence for the last printed status
-  private _err: write;
+  private readonly _err: write;
   protected _globalConfig: Config.GlobalConfig;
-  private _out: write;
-  private _status: Status;
-  private _bufferedOutput: Set<FlushBufferedOutput>;
+  private readonly _out: write;
+  private readonly _status: Status;
+  private readonly _bufferedOutput: Set<FlushBufferedOutput>;
 
   static readonly filename = __filename;
 
@@ -47,19 +48,23 @@ export default class DefaultReporter extends BaseReporter {
     this._clear = '';
     this._out = process.stdout.write.bind(process.stdout);
     this._err = process.stderr.write.bind(process.stderr);
-    this._status = new Status();
+    this._status = new Status(globalConfig);
     this._bufferedOutput = new Set();
     this.__wrapStdio(process.stdout);
     this.__wrapStdio(process.stderr);
     this._status.onChange(() => {
+      this.__beginSynchronizedUpdate(
+        this._globalConfig.useStderr ? this._err : this._out,
+      );
       this.__clearStatus();
       this.__printStatus();
+      this.__endSynchronizedUpdate(
+        this._globalConfig.useStderr ? this._err : this._out,
+      );
     });
   }
 
-  protected __wrapStdio(
-    stream: NodeJS.WritableStream | NodeJS.WriteStream,
-  ): void {
+  protected __wrapStdio(stream: NodeJS.WritableStream | WriteStream): void {
     const write = stream.write.bind(stream);
 
     let buffer: Array<string> = [];
@@ -70,11 +75,17 @@ export default class DefaultReporter extends BaseReporter {
       buffer = [];
 
       // This is to avoid conflicts between random output and status text
+      this.__beginSynchronizedUpdate(
+        this._globalConfig.useStderr ? this._err : this._out,
+      );
       this.__clearStatus();
       if (string) {
         write(string);
       }
       this.__printStatus();
+      this.__endSynchronizedUpdate(
+        this._globalConfig.useStderr ? this._err : this._out,
+      );
 
       this._bufferedOutput.delete(flushBufferedOutput);
     };
@@ -191,15 +202,13 @@ export default class DefaultReporter extends BaseReporter {
     result: TestResult,
   ): void {
     // log retry errors if any exist
-    result.testResults.forEach(testResult => {
+    for (const testResult of result.testResults) {
       const testRetryReasons = testResult.retryReasons;
       if (testRetryReasons && testRetryReasons.length > 0) {
         this.log(
-          `${chalk.reset.inverse.bold.yellow(
-            ' LOGGING RETRY ERRORS ',
-          )} ${chalk.bold(testResult.fullName)}`,
+          `${chalk.reset.inverse.bold.yellow(' LOGGING RETRY ERRORS ')} ${chalk.bold(testResult.fullName)}`,
         );
-        testRetryReasons.forEach((retryReasons, index) => {
+        for (const [index, retryReasons] of testRetryReasons.entries()) {
           let {message, stack} = separateMessageFromStack(retryReasons);
           stack = this._globalConfig.noStackTrace
             ? ''
@@ -213,18 +222,14 @@ export default class DefaultReporter extends BaseReporter {
             `${chalk.reset.inverse.bold.blueBright(` RETRY ${index + 1} `)}\n`,
           );
           this.log(`${message}\n${stack}\n`);
-        });
+        }
       }
-    });
+    }
 
     this.log(getResultHeader(result, this._globalConfig, config));
     if (result.console) {
       this.log(
-        `  ${TITLE_BULLET}Console\n\n${getConsoleOutput(
-          result.console,
-          config,
-          this._globalConfig,
-        )}`,
+        `  ${TITLE_BULLET}Console\n\n${getConsoleOutput(result.console, config, this._globalConfig)}`,
       );
     }
   }
@@ -239,6 +244,6 @@ export default class DefaultReporter extends BaseReporter {
     }
     const didUpdate = this._globalConfig.updateSnapshot === 'all';
     const snapshotStatuses = getSnapshotStatus(result.snapshot, didUpdate);
-    snapshotStatuses.forEach(this.log);
+    for (const status of snapshotStatuses) this.log(status);
   }
 }

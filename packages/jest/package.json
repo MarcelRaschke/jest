@@ -1,26 +1,24 @@
 {
   "name": "jest",
   "description": "Delightful JavaScript Testing.",
-  "version": "28.1.1",
+  "version": "30.0.0-alpha.7",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
+      "require": "./build/index.js",
+      "import": "./build/index.mjs",
       "default": "./build/index.js"
     },
     "./package.json": "./package.json",
     "./bin/jest": "./bin/jest.js"
   },
   "dependencies": {
-    "@jest/core": "^28.1.1",
-    "@jest/types": "^28.1.1",
+    "@jest/core": "workspace:*",
+    "@jest/types": "workspace:*",
     "import-local": "^3.0.2",
-    "jest-cli": "^28.1.1"
-  },
-  "devDependencies": {
-    "@tsd/typescript": "~4.7.3",
-    "tsd-lite": "^0.5.1"
+    "jest-cli": "workspace:*"
   },
   "peerDependencies": {
     "node-notifier": "^8.0.1 || ^9.0.0 || ^10.0.0"
@@ -32,11 +30,11 @@
   },
   "bin": "./bin/jest.js",
   "engines": {
-    "node": "^12.13.0 || ^14.15.0 || ^16.10.0 || >=17.0.0"
+    "node": "^16.10.0 || ^18.12.0 || >=20.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/facebook/jest.git",
+    "url": "https://github.com/jestjs/jest.git",
     "directory": "packages/jest"
   },
   "homepage": "https://jestjs.io/",

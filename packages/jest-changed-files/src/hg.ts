@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -17,25 +17,19 @@ const adapter: SCMAdapter = {
     const includePaths = options.includePaths ?? [];
 
     const args = ['status', '-amnu'];
-    if (options.withAncestor) {
+    if (options.withAncestor === true) {
       args.push('--rev', 'first(min(!public() & ::.)^+.^)');
-    } else if (options.changedSince) {
+    } else if (
+      options.changedSince != null &&
+      options.changedSince.length > 0
+    ) {
       args.push('--rev', `ancestor(., ${options.changedSince})`);
     } else if (options.lastCommit === true) {
       args.push('--change', '.');
     }
     args.push(...includePaths);
 
-    let result: execa.ExecaReturnValue;
-
-    try {
-      result = await execa('hg', args, {cwd, env});
-    } catch (e: any) {
-      // TODO: Should we keep the original `message`?
-      e.message = e.stderr;
-
-      throw e;
-    }
+    const result = await execa('hg', args, {cwd, env});
 
     return result.stdout
       .split('\n')

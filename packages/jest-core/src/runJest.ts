@@ -1,20 +1,22 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import * as path from 'path';
+import {performance} from 'perf_hooks';
+import type {WriteStream} from 'tty';
 import chalk = require('chalk');
-import exit = require('exit');
+import exit = require('exit-x');
 import * as fs from 'graceful-fs';
 import {CustomConsole} from '@jest/console';
 import {
-  AggregatedResult,
-  Test,
-  TestContext,
-  TestResultsProcessor,
+  type AggregatedResult,
+  type Test,
+  type TestContext,
+  type TestResultsProcessor,
   formatTestResults,
   makeEmptyAggregatedTestResult,
 } from '@jest/test-result';
@@ -23,26 +25,35 @@ import type {Config} from '@jest/types';
 import type {ChangedFiles, ChangedFilesPromise} from 'jest-changed-files';
 import Resolver from 'jest-resolve';
 import {requireOrImportModule, tryRealpath} from 'jest-util';
-import {JestHook, JestHookEmitter, TestWatcher} from 'jest-watcher';
+import {JestHook, type JestHookEmitter, type TestWatcher} from 'jest-watcher';
 import type FailedTestsCache from './FailedTestsCache';
 import SearchSource from './SearchSource';
-import {TestSchedulerContext, createTestScheduler} from './TestScheduler';
-import collectNodeHandles, {HandleCollectionResult} from './collectHandles';
+import {type TestSchedulerContext, createTestScheduler} from './TestScheduler';
+import collectNodeHandles, {
+  type HandleCollectionResult,
+} from './collectHandles';
 import getNoTestsFoundMessage from './getNoTestsFoundMessage';
+import serializeToJSON from './lib/serializeToJSON';
 import runGlobalHook from './runGlobalHook';
 import type {Filter, TestRunData} from './types';
 
 const getTestPaths = async (
   globalConfig: Config.GlobalConfig,
+  projectConfig: Config.ProjectConfig,
   source: SearchSource,
-  outputStream: NodeJS.WriteStream,
+  outputStream: WriteStream,
   changedFiles: ChangedFiles | undefined,
   jestHooks: JestHookEmitter,
   filter?: Filter,
 ) => {
-  const data = await source.getTestPaths(globalConfig, changedFiles, filter);
+  const data = await source.getTestPaths(
+    globalConfig,
+    projectConfig,
+    changedFiles,
+    filter,
+  );
 
-  if (!data.tests.length && globalConfig.onlyChanged && data.noSCM) {
+  if (data.tests.length === 0 && globalConfig.onlyChanged && data.noSCM) {
     new CustomConsole(outputStream, outputStream).log(
       'Jest can only find uncommitted changed files in a git or hg ' +
         'repository. If you make your project a git or hg ' +
@@ -73,7 +84,7 @@ type ProcessResultOptions = Pick<
 > & {
   collectHandles?: HandleCollectionResult;
   onComplete?: (result: AggregatedResult) => void;
-  outputStream: NodeJS.WriteStream;
+  outputStream: WriteStream;
 };
 
 const processResults = async (
@@ -96,22 +107,22 @@ const processResults = async (
   }
 
   if (testResultsProcessor) {
-    const processor = await requireOrImportModule<TestResultsProcessor>(
-      testResultsProcessor,
-    );
-    runResults = processor(runResults);
+    const processor =
+      await requireOrImportModule<TestResultsProcessor>(testResultsProcessor);
+    runResults = await processor(runResults);
   }
   if (isJSON) {
+    const jsonString = serializeToJSON(formatTestResults(runResults));
     if (outputFile) {
       const cwd = tryRealpath(process.cwd());
       const filePath = path.resolve(cwd, outputFile);
 
-      fs.writeFileSync(filePath, JSON.stringify(formatTestResults(runResults)));
+      fs.writeFileSync(filePath, `${jsonString}\n`);
       outputStream.write(
         `Test results written to: ${path.relative(cwd, filePath)}\n`,
       );
     } else {
-      process.stdout.write(JSON.stringify(formatTestResults(runResults)));
+      process.stdout.write(`${jsonString}\n`);
     }
   }
 
@@ -137,7 +148,7 @@ export default async function runJest({
 }: {
   globalConfig: Config.GlobalConfig;
   contexts: Array<TestContext>;
-  outputStream: NodeJS.WriteStream;
+  outputStream: WriteStream;
   testWatcher: TestWatcher;
   jestHooks?: JestHookEmitter;
   startRun: (globalConfig: Config.GlobalConfig) => void;
@@ -153,7 +164,7 @@ export default async function runJest({
   const Sequencer: typeof TestSequencer = await requireOrImportModule(
     globalConfig.testSequencer,
   );
-  const sequencer = new Sequencer();
+  const sequencer = new Sequencer({contexts, globalConfig});
   let allTests: Array<Test> = [];
 
   if (changedFilesPromise && globalConfig.watch) {
@@ -174,26 +185,29 @@ export default async function runJest({
 
   const searchSources = contexts.map(context => new SearchSource(context));
 
+  performance.mark('jest/getTestPaths:start');
   const testRunData: TestRunData = await Promise.all(
     contexts.map(async (context, index) => {
       const searchSource = searchSources[index];
       const matches = await getTestPaths(
         globalConfig,
+        context.config,
         searchSource,
         outputStream,
         changedFilesPromise && (await changedFilesPromise),
         jestHooks,
         filter,
       );
-      allTests = allTests.concat(matches.tests);
+      allTests = [...allTests, ...matches.tests];
 
       return {context, matches};
     }),
   );
+  performance.mark('jest/getTestPaths:end');
 
   if (globalConfig.shard) {
     if (typeof sequencer.shard !== 'function') {
-      throw new Error(
+      throw new TypeError(
         `Shard ${globalConfig.shard.shardIndex}/${globalConfig.shard.shardCount} requested, but test sequencer ${Sequencer.name} in ${globalConfig.testSequencer} has no shard method.`,
       );
     }
@@ -203,14 +217,22 @@ export default async function runJest({
   allTests = await sequencer.sort(allTests);
 
   if (globalConfig.listTests) {
-    const testsPaths = Array.from(new Set(allTests.map(test => test.path)));
-    /* eslint-disable no-console */
+    const testsPaths = [...new Set(allTests.map(test => test.path))];
+    let testsListOutput;
+
     if (globalConfig.json) {
-      console.log(JSON.stringify(testsPaths));
+      testsListOutput = JSON.stringify(testsPaths);
     } else {
-      console.log(testsPaths.join('\n'));
+      testsListOutput = testsPaths.join('\n');
     }
-    /* eslint-enable */
+
+    if (globalConfig.outputFile) {
+      const outputFile = path.resolve(process.cwd(), globalConfig.outputFile);
+      fs.writeFileSync(outputFile, testsListOutput, 'utf8');
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(testsListOutput);
+    }
 
     onComplete && onComplete(makeEmptyAggregatedTestResult());
     return;
@@ -255,24 +277,25 @@ export default async function runJest({
   }
 
   if (hasTests) {
+    performance.mark('jest/globalSetup:start');
     await runGlobalHook({allTests, globalConfig, moduleName: 'globalSetup'});
+    performance.mark('jest/globalSetup:end');
   }
 
   if (changedFilesPromise) {
     const changedFilesInfo = await changedFilesPromise;
     if (changedFilesInfo.changedFiles) {
       testSchedulerContext.changedFiles = changedFilesInfo.changedFiles;
-      const sourcesRelatedToTestsInChangedFilesArray = (
-        await Promise.all(
-          contexts.map(async (_, index) => {
-            const searchSource = searchSources[index];
+      const relatedFiles = await Promise.all(
+        contexts.map(async (_, index) => {
+          const searchSource = searchSources[index];
 
-            return searchSource.findRelatedSourcesFromTestsInChangedFiles(
-              changedFilesInfo,
-            );
-          }),
-        )
-      ).reduce((total, paths) => total.concat(paths), []);
+          return searchSource.findRelatedSourcesFromTestsInChangedFiles(
+            changedFilesInfo,
+          );
+        }),
+      );
+      const sourcesRelatedToTestsInChangedFilesArray = relatedFiles.flat();
       testSchedulerContext.sourcesRelatedToTestsInChangedFiles = new Set(
         sourcesRelatedToTestsInChangedFilesArray,
       );
@@ -284,14 +307,23 @@ export default async function runJest({
     ...testSchedulerContext,
   });
 
+  performance.mark('jest/scheduleAndRun:start', {
+    detail: {numTests: allTests.length},
+  });
   const results = await scheduler.scheduleTests(allTests, testWatcher);
+  performance.mark('jest/scheduleAndRun:end');
 
+  performance.mark('jest/cacheResults:start');
   sequencer.cacheResults(allTests, results);
+  performance.mark('jest/cacheResults:end');
 
   if (hasTests) {
+    performance.mark('jest/globalTeardown:start');
     await runGlobalHook({allTests, globalConfig, moduleName: 'globalTeardown'});
+    performance.mark('jest/globalTeardown:end');
   }
 
+  performance.mark('jest/processResults:start');
   await processResults(results, {
     collectHandles,
     json: globalConfig.json,
@@ -300,4 +332,5 @@ export default async function runJest({
     outputStream,
     testResultsProcessor: globalConfig.testResultsProcessor,
   });
+  performance.mark('jest/processResults:end');
 }

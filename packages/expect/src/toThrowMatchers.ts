@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -11,7 +11,7 @@
 import {isError} from '@jest/expect-utils';
 import {
   EXPECTED_COLOR,
-  MatcherHintOptions,
+  type MatcherHintOptions,
   RECEIVED_COLOR,
   matcherErrorMessage,
   matcherHint,
@@ -31,9 +31,8 @@ import {
 } from './print';
 import type {
   ExpectationResult,
-  MatcherState,
+  MatcherFunction,
   MatchersObject,
-  RawMatcherFn,
   SyncExpectationResult,
 } from './types';
 
@@ -77,12 +76,8 @@ const getThrown = (e: any): Thrown => {
 export const createMatcher = (
   matcherName: string,
   fromPromise?: boolean,
-): RawMatcherFn =>
-  function (
-    this: MatcherState,
-    received: Function,
-    expected: any,
-  ): ExpectationResult {
+): MatcherFunction<[any]> =>
+  function (received, expected): ExpectationResult {
     const options = {
       isNot: this.isNot,
       promise: this.promise,
@@ -93,7 +88,13 @@ export const createMatcher = (
     if (fromPromise && isError(received)) {
       thrown = getThrown(received);
     } else {
-      if (typeof received !== 'function') {
+      if (typeof received === 'function') {
+        try {
+          received();
+        } catch (error) {
+          thrown = getThrown(error);
+        }
+      } else {
         if (!fromPromise) {
           const placeholder = expected === undefined ? '' : 'expected';
           throw new Error(
@@ -103,12 +104,6 @@ export const createMatcher = (
               printWithType('Received', received, printReceived),
             ),
           );
-        }
-      } else {
-        try {
-          received();
-        } catch (e) {
-          thrown = getThrown(e);
         }
       }
     }
@@ -143,7 +138,6 @@ export const createMatcher = (
 
 const matchers: MatchersObject = {
   toThrow: createMatcher('toThrow'),
-  toThrowError: createMatcher('toThrowError'),
 };
 
 const toThrowExpectedRegExp = (
@@ -176,9 +170,9 @@ const toThrowExpectedRegExp = (
         (thrown === null
           ? `\n${DID_NOT_THROW}`
           : thrown.hasMessage
-          ? formatReceived('Received message: ', thrown, 'message') +
-            formatStack(thrown)
-          : formatReceived('Received value:   ', thrown, 'value'));
+            ? formatReceived('Received message: ', thrown, 'message') +
+              formatStack(thrown)
+            : formatReceived('Received value:   ', thrown, 'value'));
 
   return {message, pass};
 };
@@ -216,10 +210,10 @@ const toThrowExpectedAsymmetric = (
         (thrown === null
           ? DID_NOT_THROW
           : thrown.hasMessage
-          ? formatReceived('Received name:    ', thrown, 'name') +
-            formatReceived('Received message: ', thrown, 'message') +
-            formatStack(thrown)
-          : formatReceived('Thrown value: ', thrown, 'value'));
+            ? formatReceived('Received name:    ', thrown, 'name') +
+              formatReceived('Received message: ', thrown, 'message') +
+              formatStack(thrown)
+            : formatReceived('Thrown value: ', thrown, 'value'));
 
   return {message, pass};
 };
@@ -230,14 +224,30 @@ const toThrowExpectedObject = (
   thrown: Thrown | null,
   expected: Error,
 ): SyncExpectationResult => {
-  const pass = thrown !== null && thrown.message === expected.message;
+  const expectedMessageAndCause = createMessageAndCause(expected);
+  const thrownMessageAndCause =
+    thrown === null ? null : createMessageAndCause(thrown.value);
+  const isCompareErrorInstance = thrown?.isError && expected instanceof Error;
+  const isExpectedCustomErrorInstance =
+    expected.constructor.name !== Error.name;
+
+  const pass =
+    thrown !== null &&
+    thrown.message === expected.message &&
+    thrownMessageAndCause === expectedMessageAndCause &&
+    (!isCompareErrorInstance ||
+      !isExpectedCustomErrorInstance ||
+      thrown.value instanceof expected.constructor);
 
   const message = pass
     ? () =>
         // eslint-disable-next-line prefer-template
         matcherHint(matcherName, undefined, undefined, options) +
         '\n\n' +
-        formatExpected('Expected message: not ', expected.message) +
+        formatExpected(
+          `Expected ${messageAndCause(expected)}: not `,
+          expectedMessageAndCause,
+        ) +
         (thrown !== null && thrown.hasMessage
           ? formatStack(thrown)
           : formatReceived('Received value:       ', thrown, 'value'))
@@ -247,22 +257,27 @@ const toThrowExpectedObject = (
         '\n\n' +
         (thrown === null
           ? // eslint-disable-next-line prefer-template
-            formatExpected('Expected message: ', expected.message) +
+            formatExpected(
+              `Expected ${messageAndCause(expected)}: `,
+              expectedMessageAndCause,
+            ) +
             '\n' +
             DID_NOT_THROW
           : thrown.hasMessage
-          ? // eslint-disable-next-line prefer-template
-            printDiffOrStringify(
-              expected.message,
-              thrown.message,
-              'Expected message',
-              'Received message',
-              true,
-            ) +
-            '\n' +
-            formatStack(thrown)
-          : formatExpected('Expected message: ', expected.message) +
-            formatReceived('Received value:   ', thrown, 'value'));
+            ? // eslint-disable-next-line prefer-template
+              printDiffOrStringify(
+                expectedMessageAndCause,
+                thrownMessageAndCause,
+                `Expected ${messageAndCause(expected)}`,
+                `Received ${messageAndCause(thrown.value)}`,
+                true,
+              ) +
+              '\n' +
+              formatStack(thrown)
+            : formatExpected(
+                `Expected ${messageAndCause(expected)}: `,
+                expectedMessageAndCause,
+              ) + formatReceived('Received value:   ', thrown, 'value'));
 
   return {message, pass};
 };
@@ -351,9 +366,9 @@ const toThrowExpectedString = (
         (thrown === null
           ? `\n${DID_NOT_THROW}`
           : thrown.hasMessage
-          ? formatReceived('Received message:   ', thrown, 'message') +
-            formatStack(thrown)
-          : formatReceived('Received value:     ', thrown, 'value'));
+            ? formatReceived('Received message:   ', thrown, 'message') +
+              formatStack(thrown)
+            : formatReceived('Received value:     ', thrown, 'value'));
 
   return {message, pass};
 };
@@ -451,5 +466,27 @@ const formatStack = (thrown: Thrown | null) =>
           noStackTrace: false,
         },
       );
+
+function createMessageAndCauseMessage(error: Error): string {
+  if (error.cause instanceof Error) {
+    return `{ message: ${error.message}, cause: ${createMessageAndCauseMessage(
+      error.cause,
+    )}}`;
+  }
+
+  return `{ message: ${error.message} }`;
+}
+
+function createMessageAndCause(error: Error) {
+  if (error.cause instanceof Error) {
+    return createMessageAndCauseMessage(error);
+  }
+
+  return error.message;
+}
+
+function messageAndCause(error: Error) {
+  return error.cause === undefined ? 'message' : 'message and cause';
+}
 
 export default matchers;

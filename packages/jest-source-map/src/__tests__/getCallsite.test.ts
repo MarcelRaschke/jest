@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -11,7 +11,9 @@ import getCallsite from '../getCallsite';
 
 jest.mock('graceful-fs');
 jest.mock('@jridgewell/trace-mapping', () => {
-  const actual = jest.requireActual('@jridgewell/trace-mapping');
+  const actual = jest.requireActual<typeof import('@jridgewell/trace-mapping')>(
+    '@jridgewell/trace-mapping',
+  );
 
   return {
     ...actual,
@@ -30,7 +32,7 @@ describe('getCallsite', () => {
   });
 
   test('ignores errors when fs throws', () => {
-    (fs.readFileSync as jest.Mock).mockImplementation(() => {
+    jest.mocked(fs.readFileSync).mockImplementation(() => {
       throw new Error('Mock error');
     });
 
@@ -43,7 +45,7 @@ describe('getCallsite', () => {
   });
 
   test('reads source map file to determine line and column', () => {
-    (fs.readFileSync as jest.Mock).mockImplementation(() =>
+    jest.mocked(fs.readFileSync).mockImplementation(() =>
       JSON.stringify({
         file: 'file.js',
         mappings: 'AAAA,OAAO,MAAM,KAAK,GAAG,QAAd',

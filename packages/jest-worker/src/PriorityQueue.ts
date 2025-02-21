@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -28,9 +28,9 @@ type QueueItem = {
  */
 export default class PriorityQueue implements TaskQueue {
   private _queue: Array<MinHeap<QueueItem>> = [];
-  private _sharedQueue = new MinHeap<QueueItem>();
+  private readonly _sharedQueue = new MinHeap<QueueItem>();
 
-  constructor(private _computePriority: ComputeTaskPriorityCallback) {}
+  constructor(private readonly _computePriority: ComputeTaskPriorityCallback) {}
 
   enqueue(task: QueueChildMessage, workerId?: number): void {
     if (workerId == null) {
@@ -86,7 +86,7 @@ type HeapItem = {
 };
 
 class MinHeap<TItem extends HeapItem> {
-  private _heap: Array<TItem | null> = [];
+  private readonly _heap: Array<TItem | null> = [];
 
   peek(): TItem | null {
     return this._heap[0] ?? null;
@@ -133,6 +133,7 @@ class MinHeap<TItem extends HeapItem> {
     nodes[0] = lastElement ?? null;
     const element = nodes[0]!;
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       let swapIndex = null;
       const rightChildIndex = (index + 1) * 2;

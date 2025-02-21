@@ -67,8 +67,8 @@ If you'd like to learn more about running `jest` through the command line, take 
 
 Based on your project, Jest will ask you a few questions and will create a basic configuration file with a short description for each option:
 
-```bash
-jest --init
+```bash npm2yarn
+npm init jest@latest
 ```
 
 ### Using Babel
@@ -87,9 +87,10 @@ module.exports = {
 };
 ```
 
-_The ideal configuration for Babel will depend on your project._ See [Babel's docs](https://babeljs.io/docs/en/) for more details.
+The ideal configuration for Babel will depend on your project. See [Babel's docs](https://babeljs.io/docs/en/) for more details.
 
-<details><summary markdown="span"><strong>Making your Babel config jest-aware</strong></summary>
+<details>
+  <summary markdown="span"><strong>Making your Babel config jest-aware</strong></summary>
 
 Jest will set `process.env.NODE_ENV` to `'test'` if it's not set to something else. You can use that in your configuration to conditionally setup only the compilation needed for Jest, e.g.
 
@@ -104,7 +105,9 @@ module.exports = api => {
 };
 ```
 
-> Note: `babel-jest` is automatically installed when installing Jest and will automatically transform files if a babel configuration exists in your project. To avoid this behavior, you can explicitly reset the `transform` configuration option:
+:::note
+
+`babel-jest` is automatically installed when installing Jest and will automatically transform files if a babel configuration exists in your project. To avoid this behavior, you can explicitly reset the `transform` configuration option:
 
 ```javascript title="jest.config.js"
 module.exports = {
@@ -112,13 +115,27 @@ module.exports = {
 };
 ```
 
+:::
+
 </details>
+
+## Using with bundlers
+
+Most of the time you do not need to do anything special to work with different bundlers - the exception is if you have some plugin or configuration which generates files or have custom file resolution rules.
 
 ### Using webpack
 
 Jest can be used in projects that use [webpack](https://webpack.js.org/) to manage assets, styles, and compilation. webpack does offer some unique challenges over other tools. Refer to the [webpack guide](Webpack.md) to get started.
 
-### Using parcel
+### Using Vite
+
+Jest is not supported by Vite due to incompatibilities with the Vite [plugin system](https://github.com/vitejs/vite/issues/1955#issuecomment-776009094).
+
+There are examples for Jest integration with Vite in the [vite-jest](https://github.com/sodatea/vite-jest) library. However, this library is not compatible with versions of Vite later than 2.4.2.
+
+One alternative is [Vitest](https://vitest.dev/) which has an API compatible Jest.
+
+### Using Parcel
 
 Jest can be used in projects that use [parcel-bundler](https://parceljs.org/) to manage assets, styles, and compilation similar to webpack. Parcel requires zero configuration. Refer to the official [docs](https://parceljs.org/docs/) to get started.
 
@@ -154,12 +171,80 @@ However, there are some [caveats](https://babeljs.io/docs/en/babel-plugin-transf
 npm install --save-dev ts-jest
 ```
 
+In order for Jest to transpile TypeScript with `ts-jest`, you may also need to create a [configuration](https://kulshekhar.github.io/ts-jest/docs/getting-started/installation#jest-config-file) file.
+
 #### Type definitions
 
-You may also want to install the [`@types/jest`](https://www.npmjs.com/package/@types/jest) module for the version of Jest you're using. This will help provide full typing when writing your tests with TypeScript.
+There are two ways to have [Jest global APIs](GlobalAPI.md) typed for test files written in TypeScript.
 
-> For `@types/*` modules it's recommended to try to match the version of the associated module. For example, if you are using `26.4.0` of `jest` then using `26.4.x` of `@types/jest` is ideal. In general, try to match the major (`26`) and minor (`4`) version as closely as possible.
+You can use type definitions which ships with Jest and will update each time you update Jest. Install the `@jest/globals` package:
+
+```bash npm2yarn
+npm install --save-dev @jest/globals
+```
+
+And import the APIs from it:
+
+```ts title="sum.test.ts"
+import {describe, expect, test} from '@jest/globals';
+import {sum} from './sum';
+
+describe('sum module', () => {
+  test('adds 1 + 2 to equal 3', () => {
+    expect(sum(1, 2)).toBe(3);
+  });
+});
+```
+
+:::tip
+
+See the additional usage documentation of [`describe.each`/`test.each`](GlobalAPI.md#typescript-usage) and [`mock functions`](MockFunctionAPI.md#typescript-usage).
+
+:::
+
+Or you may choose to install the [`@types/jest`](https://npmjs.com/package/@types/jest) package. It provides types for Jest globals without a need to import them.
 
 ```bash npm2yarn
 npm install --save-dev @types/jest
+```
+
+:::info
+
+`@types/jest` is a third party library maintained at [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/jest), hence the latest Jest features or versions may not be covered yet. Try to match versions of Jest and `@types/jest` as closely as possible. For example, if you are using Jest `27.4.0` then installing `27.4.x` of `@types/jest` is ideal.
+
+:::
+
+### Using ESLint
+
+Jest can be used with ESLint without any further configuration as long as you import the [Jest global helpers](GlobalAPI.md) (`describe`, `it`, etc.) from `@jest/globals` before using them in your test file. This is necessary to avoid `no-undef` errors from ESLint, which doesn't know about the Jest globals.
+
+If you'd like to avoid these imports, you can configure your [ESLint environment](https://eslint.org/docs/latest/use/configure/language-options#specifying-environments) to support these globals by adding the `jest` environment:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["tests/**/*"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}
+```
+
+Or use [`eslint-plugin-jest`](https://github.com/jest-community/eslint-plugin-jest), which has a similar effect:
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["tests/**/*"],
+      "plugins": ["jest"],
+      "env": {
+        "jest/globals": true
+      }
+    }
+  ]
+}
 ```

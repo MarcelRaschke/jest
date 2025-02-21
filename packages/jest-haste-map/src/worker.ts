@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -66,10 +66,10 @@ export async function worker(data: WorkerMessage): Promise<WorkerMetadata> {
         id = fileData.name;
         module = [relativeFilePath, H.PACKAGE];
       }
-    } catch (err: any) {
-      throw new Error(`Cannot parse ${filePath} as JSON: ${err.message}`);
+    } catch (error: any) {
+      throw new Error(`Cannot parse ${filePath} as JSON: ${error.message}`);
     }
-  } else if (!blacklist.has(filePath.substring(filePath.lastIndexOf('.')))) {
+  } else if (!blacklist.has(filePath.slice(filePath.lastIndexOf('.')))) {
     // Process a random file that is returned as a MODULE.
     if (hasteImpl) {
       id = hasteImpl.getHasteName(filePath);
@@ -83,13 +83,13 @@ export async function worker(data: WorkerMessage): Promise<WorkerMetadata> {
             false,
           )
         : defaultDependencyExtractor;
-      dependencies = Array.from(
-        extractor.extract(
+      dependencies = [
+        ...extractor.extract(
           content,
           filePath,
           defaultDependencyExtractor.extract,
         ),
-      );
+      ];
     }
 
     if (id) {
@@ -100,7 +100,7 @@ export async function worker(data: WorkerMessage): Promise<WorkerMetadata> {
 
   // If a SHA-1 is requested on update, compute it.
   if (computeSha1) {
-    sha1 = sha1hex(getContent() || fs.readFileSync(filePath));
+    sha1 = sha1hex(content || fs.readFileSync(filePath));
   }
 
   return {dependencies, id, module, sha1};

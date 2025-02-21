@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,7 @@
 
 import chalk = require('chalk');
 import type {Config} from '@jest/types';
-import pluralize from './pluralize';
+import {pluralize} from 'jest-util';
 import type {Stats, TestRunData} from './types';
 
 export default function getNoTestFoundVerbose(
@@ -33,7 +33,7 @@ export default function getNoTestFoundVerbose(
         }
         return null;
       })
-      .filter(line => line)
+      .filter(Boolean)
       .join('\n');
 
     return testRun.matches.total
@@ -57,7 +57,7 @@ export default function getNoTestFoundVerbose(
       .join(', ')}`;
   } else {
     dataMessage = `Pattern: ${chalk.yellow(
-      globalConfig.testPathPattern,
+      globalConfig.testPathPatterns.toPretty(),
     )} - 0 matches`;
   }
 

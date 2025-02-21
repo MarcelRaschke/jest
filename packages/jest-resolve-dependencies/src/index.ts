@@ -1,14 +1,14 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import * as path from 'path';
-import type {FS as HasteFS} from 'jest-haste-map';
+import type {IHasteFS} from 'jest-haste-map';
 import type {ResolveModuleConfig, default as Resolver} from 'jest-resolve';
-import {SnapshotResolver, isSnapshotPath} from 'jest-snapshot';
+import {type SnapshotResolver, isSnapshotPath} from 'jest-snapshot';
 
 export type ResolvedModule = {
   file: string;
@@ -20,13 +20,13 @@ export type ResolvedModule = {
  * to retrieve a list of all transitive inverse dependencies.
  */
 export class DependencyResolver {
-  private _hasteFS: HasteFS;
-  private _resolver: Resolver;
-  private _snapshotResolver: SnapshotResolver;
+  private readonly _hasteFS: IHasteFS;
+  private readonly _resolver: Resolver;
+  private readonly _snapshotResolver: SnapshotResolver;
 
   constructor(
     resolver: Resolver,
-    hasteFS: HasteFS,
+    hasteFS: IHasteFS,
     snapshotResolver: SnapshotResolver,
   ) {
     this._resolver = resolver;
@@ -36,6 +36,7 @@ export class DependencyResolver {
 
   resolve(file: string, options?: ResolveModuleConfig): Array<string> {
     const dependencies = this._hasteFS.getDependencies(file);
+    const fallbackOptions: ResolveModuleConfig = {conditions: undefined};
     if (!dependencies) {
       return [];
     }
@@ -51,17 +52,21 @@ export class DependencyResolver {
         resolvedDependency = this._resolver.resolveModule(
           file,
           dependency,
-          options,
+          options ?? fallbackOptions,
         );
       } catch {
         try {
-          resolvedDependency = this._resolver.getMockModule(file, dependency);
+          resolvedDependency = this._resolver.getMockModule(
+            file,
+            dependency,
+            options ?? fallbackOptions,
+          );
         } catch {
           // leave resolvedDependency as undefined if nothing can be found
         }
       }
 
-      if (!resolvedDependency) {
+      if (resolvedDependency == null) {
         return acc;
       }
 
@@ -73,12 +78,13 @@ export class DependencyResolver {
         resolvedMockDependency = this._resolver.getMockModule(
           resolvedDependency,
           path.basename(dependency),
+          options ?? fallbackOptions,
         );
       } catch {
         // leave resolvedMockDependency as undefined if nothing can be found
       }
 
-      if (resolvedMockDependency) {
+      if (resolvedMockDependency != null) {
         const dependencyMockDir = path.resolve(
           path.dirname(resolvedDependency),
           '__mocks__',
@@ -101,7 +107,7 @@ export class DependencyResolver {
     filter: (file: string) => boolean,
     options?: ResolveModuleConfig,
   ): Array<ResolvedModule> {
-    if (!paths.size) {
+    if (paths.size === 0) {
       return [];
     }
 
@@ -112,7 +118,7 @@ export class DependencyResolver {
     ) => {
       const visitedModules = new Set();
       const result: Array<ResolvedModule> = [];
-      while (changed.size) {
+      while (changed.size > 0) {
         changed = new Set(
           moduleMap.reduce<Array<string>>((acc, module) => {
             if (
@@ -133,13 +139,14 @@ export class DependencyResolver {
           }, []),
         );
       }
-      return result.concat(
-        Array.from(related).map(file => ({dependencies: [], file})),
-      );
+      return [
+        ...result,
+        ...[...related].map(file => ({dependencies: [], file})),
+      ];
     };
 
     const relatedPaths = new Set<string>();
-    const changed: Set<string> = new Set();
+    const changed = new Set<string>();
     for (const path of paths) {
       if (this._hasteFS.exists(path)) {
         const modulePath = isSnapshotPath(path)

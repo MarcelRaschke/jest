@@ -1,19 +1,19 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
  */
 
-import exit = require('exit');
+import exit = require('exit-x');
 import type {
   SerializableError,
   TestFileEvent,
   TestResult,
 } from '@jest/test-result';
 import type {Config} from '@jest/types';
-import HasteMap, {SerializableModuleMap} from 'jest-haste-map';
+import HasteMap, {type SerializableModuleMap} from 'jest-haste-map';
 import {separateMessageFromStack} from 'jest-message-util';
 import type Resolver from 'jest-resolve';
 import Runtime from 'jest-runtime';
@@ -35,7 +35,11 @@ type WorkerData = {
 
 // Make sure uncaught errors are logged before we exit.
 process.on('uncaughtException', err => {
-  console.error(err.stack);
+  if (err.stack) {
+    console.error(err.stack);
+  } else {
+    console.error(err);
+  }
   exit(1);
 });
 

@@ -1,9 +1,9 @@
 {
   "name": "@jest/expect",
-  "version": "28.1.1",
+  "version": "30.0.0-alpha.7",
   "repository": {
     "type": "git",
-    "url": "https://github.com/facebook/jest.git",
+    "url": "https://github.com/jestjs/jest.git",
     "directory": "packages/jest-expect"
   },
   "license": "MIT",
@@ -12,20 +12,18 @@
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
+      "require": "./build/index.js",
+      "import": "./build/index.mjs",
       "default": "./build/index.js"
     },
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "expect": "^28.1.1",
-    "jest-snapshot": "^28.1.1"
-  },
-  "devDependencies": {
-    "@tsd/typescript": "~4.7.3",
-    "tsd-lite": "^0.5.1"
+    "expect": "workspace:*",
+    "jest-snapshot": "workspace:*"
   },
   "engines": {
-    "node": "^12.13.0 || ^14.15.0 || ^16.10.0 || >=17.0.0"
+    "node": "^16.10.0 || ^18.12.0 || >=20.0.0"
   },
   "publishConfig": {
     "access": "public"

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -8,7 +8,8 @@
 
 import type {EqualsFunction, Tester} from '@jest/expect-utils';
 import type * as jestMatcherUtils from 'jest-matcher-utils';
-import {INTERNAL_MATCHER_FLAG} from './jestMatchersObject';
+import type {MockInstance} from 'jest-mock';
+import type {INTERNAL_MATCHER_FLAG} from './jestMatchersObject';
 
 export type SyncExpectationResult = {
   pass: boolean;
@@ -19,17 +20,22 @@ export type AsyncExpectationResult = Promise<SyncExpectationResult>;
 
 export type ExpectationResult = SyncExpectationResult | AsyncExpectationResult;
 
-export type MatcherFunctionWithState<
-  State extends MatcherState = MatcherState,
-  Expected extends Array<any> = [] /** TODO should be: extends Array<unknown> = [] */,
-> = (this: State, actual: unknown, ...expected: Expected) => ExpectationResult;
+export type MatcherFunctionWithContext<
+  Context extends MatcherContext = MatcherContext,
+  Expected extends
+    Array<any> = [] /** TODO should be: extends Array<unknown> = [] */,
+> = (
+  this: Context,
+  actual: unknown,
+  ...expected: Expected
+) => ExpectationResult;
 
 export type MatcherFunction<Expected extends Array<unknown> = []> =
-  MatcherFunctionWithState<MatcherState, Expected>;
+  MatcherFunctionWithContext<MatcherContext, Expected>;
 
 // TODO should be replaced with `MatcherFunctionWithContext`
-export type RawMatcherFn<State extends MatcherState = MatcherState> = {
-  (this: State, actual: any, ...expected: Array<any>): ExpectationResult;
+export type RawMatcherFn<Context extends MatcherContext = MatcherContext> = {
+  (this: Context, actual: any, ...expected: Array<any>): ExpectationResult;
   /** @internal */
   [INTERNAL_MATCHER_FLAG]?: boolean;
 };
@@ -41,26 +47,34 @@ export type MatchersObject = {
 export type ThrowingMatcherFn = (actual: any) => void;
 export type PromiseMatcherFn = (actual: any) => Promise<void>;
 
-export interface MatcherState {
-  assertionCalls: number;
-  currentTestName?: string;
-  dontThrow?(): void;
-  error?: Error;
+export interface MatcherUtils {
+  customTesters: Array<Tester>;
+  dontThrow(): void;
   equals: EqualsFunction;
-  expand?: boolean;
-  expectedAssertionsNumber?: number | null;
-  expectedAssertionsNumberError?: Error;
-  isExpectingAssertions?: boolean;
-  isExpectingAssertionsError?: Error;
-  isNot: boolean;
-  promise: string;
-  suppressedErrors: Array<Error>;
-  testPath?: string;
   utils: typeof jestMatcherUtils & {
     iterableEquality: Tester;
     subsetEquality: Tester;
   };
 }
+
+export interface MatcherState {
+  assertionCalls: number;
+  currentConcurrentTestName?: () => string | undefined;
+  currentTestName?: string;
+  error?: Error;
+  expand?: boolean;
+  expectedAssertionsNumber: number | null;
+  expectedAssertionsNumberError?: Error;
+  isExpectingAssertions: boolean;
+  isExpectingAssertionsError?: Error;
+  isNot?: boolean;
+  numPassingAsserts: number;
+  promise?: string;
+  suppressedErrors: Array<Error>;
+  testPath?: string;
+}
+
+export type MatcherContext = MatcherUtils & Readonly<MatcherState>;
 
 export type AsymmetricMatcher = {
   asymmetricMatch(other: unknown): boolean;
@@ -77,6 +91,7 @@ export type ExpectedAssertionsErrors = Array<{
 
 export interface BaseExpect {
   assertions(numberOfAssertions: number): void;
+  addEqualityTesters(testers: Array<Tester>): void;
   extend(matchers: MatchersObject): void;
   extractExpectedAssertionsErrors(): ExpectedAssertionsErrors;
   getState(): MatcherState;
@@ -84,11 +99,10 @@ export interface BaseExpect {
   setState(state: Partial<MatcherState>): void;
 }
 
-export type Expect = {
-  <T = unknown>(actual: T): Matchers<void> &
-    Inverse<Matchers<void>> &
-    PromiseMatchers;
-} & BaseExpect &
+export type Expect = (<T = unknown>(
+  actual: T,
+) => Matchers<void, T> & Inverse<Matchers<void, T>> & PromiseMatchers<T>) &
+  BaseExpect &
   AsymmetricMatchers &
   Inverse<Omit<AsymmetricMatchers, 'any' | 'anything'>>;
 
@@ -109,53 +123,33 @@ export interface AsymmetricMatchers {
   stringMatching(sample: string | RegExp): AsymmetricMatcher;
 }
 
-type PromiseMatchers = {
+type PromiseMatchers<T = unknown> = {
   /**
    * Unwraps the reason of a rejected promise so any other matcher can be chained.
    * If the promise is fulfilled the assertion fails.
    */
-  rejects: Matchers<Promise<void>> & Inverse<Matchers<Promise<void>>>;
+  rejects: Matchers<Promise<void>, T> & Inverse<Matchers<Promise<void>, T>>;
   /**
    * Unwraps the value of a fulfilled promise so any other matcher can be chained.
    * If the promise is rejected the assertion fails.
    */
-  resolves: Matchers<Promise<void>> & Inverse<Matchers<Promise<void>>>;
+  resolves: Matchers<Promise<void>, T> & Inverse<Matchers<Promise<void>, T>>;
 };
 
-export interface Matchers<R extends void | Promise<void>> {
+export interface Matchers<R extends void | Promise<void>, T = unknown> {
   /**
-   * Ensures the last call to a mock function was provided specific args.
+   * T is a type param for the benefit of users who extend Matchers. It's
+   * intentionally unused and needs to be named T, not _T, for those users.
+   * This makes sure TypeScript agrees.
+   *
+   * @internal
    */
-  lastCalledWith(...expected: Array<unknown>): R;
-  /**
-   * Ensure that the last call to a mock function has returned a specified value.
-   */
-  lastReturnedWith(expected: unknown): R;
-  /**
-   * Ensure that a mock function is called with specific arguments on an Nth call.
-   */
-  nthCalledWith(nth: number, ...expected: Array<unknown>): R;
-  /**
-   * Ensure that the nth call to a mock function has returned a specified value.
-   */
-  nthReturnedWith(nth: number, expected: unknown): R;
+  _unusedT(expected: T): R;
   /**
    * Checks that a value is what you expect. It calls `Object.is` to compare values.
    * Don't use `toBe` with floating-point numbers.
    */
   toBe(expected: unknown): R;
-  /**
-   * Ensures that a mock function is called.
-   */
-  toBeCalled(): R;
-  /**
-   * Ensures that a mock function is called an exact number of times.
-   */
-  toBeCalledTimes(expected: number): R;
-  /**
-   * Ensure that a mock function is called with specific arguments.
-   */
-  toBeCalledWith(...expected: Array<unknown>): R;
   /**
    * Using exact equality with floating point numbers is a bad idea.
    * Rounding means that intuitive things fail.
@@ -238,22 +232,22 @@ export interface Matchers<R extends void | Promise<void>> {
   /**
    * Ensure that a mock function is called with specific arguments.
    */
-  toHaveBeenCalledWith(...expected: Array<unknown>): R;
+  toHaveBeenCalledWith(...expected: MockParameters<T>): R;
   /**
    * Ensure that a mock function is called with specific arguments on an Nth call.
    */
-  toHaveBeenNthCalledWith(nth: number, ...expected: Array<unknown>): R;
+  toHaveBeenNthCalledWith(nth: number, ...expected: MockParameters<T>): R;
   /**
    * If you have a mock function, you can use `.toHaveBeenLastCalledWith`
    * to test what arguments it was last called with.
    */
-  toHaveBeenLastCalledWith(...expected: Array<unknown>): R;
+  toHaveBeenLastCalledWith(...expected: MockParameters<T>): R;
   /**
    * Use to test the specific value that a mock function last returned.
    * If the last call to the mock function threw an error, then this matcher will fail
    * no matter what value you provided as the expected return value.
    */
-  toHaveLastReturnedWith(expected: unknown): R;
+  toHaveLastReturnedWith(expected?: unknown): R;
   /**
    * Used to check that an object has a `.length` property
    * and it is set to a certain numeric value.
@@ -264,7 +258,7 @@ export interface Matchers<R extends void | Promise<void>> {
    * If the nth call to the mock function threw an error, then this matcher will fail
    * no matter what value you provided as the expected return value.
    */
-  toHaveNthReturnedWith(nth: number, expected: unknown): R;
+  toHaveNthReturnedWith(nth: number, expected?: unknown): R;
   /**
    * Use to check if property at provided reference keyPath exists for an object.
    * For checking deeply nested properties in an object you may use dot notation or an array containing
@@ -294,7 +288,7 @@ export interface Matchers<R extends void | Promise<void>> {
   /**
    * Use to ensure that a mock function returned a specific value.
    */
-  toHaveReturnedWith(expected: unknown): R;
+  toHaveReturnedWith(expected?: unknown): R;
   /**
    * Check that a string matches a regular expression.
    */
@@ -306,18 +300,6 @@ export interface Matchers<R extends void | Promise<void>> {
     expected: Record<string, unknown> | Array<Record<string, unknown>>,
   ): R;
   /**
-   * Ensure that a mock function has returned (as opposed to thrown) at least once.
-   */
-  toReturn(): R;
-  /**
-   * Ensure that a mock function has returned (as opposed to thrown) a specified number of times.
-   */
-  toReturnTimes(expected: number): R;
-  /**
-   * Ensure that a mock function has returned a specified value at least once.
-   */
-  toReturnWith(expected: unknown): R;
-  /**
    * Use to test that objects have the same types as well as structure.
    */
   toStrictEqual(expected: unknown): R;
@@ -325,8 +307,149 @@ export interface Matchers<R extends void | Promise<void>> {
    * Used to test that a function throws when it is called.
    */
   toThrow(expected?: unknown): R;
-  /**
-   * If you want to test that a specific error is thrown inside a function.
-   */
-  toThrowError(expected?: unknown): R;
 }
+
+/**
+ * Obtains the parameters of the given function or {@link MockInstance}'s function type.
+ * ```ts
+ * type P = MockParameters<MockInstance<(foo: number) => void>>;
+ * // or without an explicit mock
+ * // type P = MockParameters<(foo: number) => void>;
+ *
+ * const params1: P = [1]; // compiles
+ * const params2: P = ['bar']; // error
+ * const params3: P = []; // error
+ * ```
+ *
+ * This is similar to {@link Parameters}, with these notable differences:
+ *
+ * 1. Each of the parameters can also accept an {@link AsymmetricMatcher}.
+ * ```ts
+ * const params4: P = [expect.anything()]; // compiles
+ * ```
+ * This works with nested types as well:
+ * ```ts
+ * type Nested = MockParameters<MockInstance<(foo: { a: number }, bar: [string]) => void>>;
+ *
+ * const params1: Nested = [{ foo: { a: 1 }}, ['value']]; // compiles
+ * const params2: Nested = [expect.anything(), expect.anything()]; // compiles
+ * const params3: Nested = [{ foo: { a: expect.anything() }}, [expect.anything()]]; // compiles
+ * ```
+ *
+ * 2. This type works with overloaded functions (up to 15 overloads):
+ * ```ts
+ * function overloaded(): void;
+ * function overloaded(foo: number): void;
+ * function overloaded(foo: number, bar: string): void;
+ * function overloaded(foo?: number, bar?: string): void {}
+ *
+ * type Overloaded = MockParameters<MockInstance<typeof overloaded>>;
+ *
+ * const params1: Overloaded = []; // compiles
+ * const params2: Overloaded = [1]; // compiles
+ * const params3: Overloaded = [1, 'value']; // compiles
+ * const params4: Overloaded = ['value']; // error
+ * const params5: Overloaded = ['value', 1]; // error
+ * ```
+ *
+ * Mocks generated with the default `MockInstance` type will evaluate to `Array<unknown>`:
+ * ```ts
+ * MockParameters<MockInstance> // Array<unknown>
+ * ```
+ *
+ * If the given type is not a `MockInstance` nor a function, this type will evaluate to `Array<unknown>`:
+ * ```ts
+ * MockParameters<boolean> // Array<unknown>
+ * ```
+ */
+type MockParameters<M> =
+  M extends MockInstance<infer F>
+    ? FunctionParameters<F>
+    : FunctionParameters<M>;
+
+/**
+ * A wrapper over `FunctionParametersInternal` which converts `never` evaluations to `Array<unknown>`.
+ *
+ * This is only necessary for Typescript versions prior to 5.3.
+ *
+ * In those versions, a function without parameters (`() => any`) is interpreted the same as an overloaded function,
+ * causing `FunctionParametersInternal` to evaluate it to `[] | Array<unknown>`, which is incorrect.
+ *
+ * The workaround is to "catch" this edge-case in `WithAsymmetricMatchers` and interpret it as `never`.
+ * However, this also affects {@link UnknownFunction} (the default generic type of `MockInstance`):
+ * ```ts
+ * FunctionParametersInternal<() => any> // [] | never --> [] --> correct
+ * FunctionParametersInternal<UnknownFunction> // never --> incorrect
+ * ```
+ * An empty array is the expected type for a function without parameters,
+ * so all that's left is converting `never` to `Array<unknown>` for the case of `UnknownFunction`,
+ * as it needs to accept _any_ combination of parameters.
+ */
+type FunctionParameters<F> =
+  FunctionParametersInternal<F> extends never
+    ? Array<unknown>
+    : FunctionParametersInternal<F>;
+
+/**
+ * 1. If the function is overloaded or has no parameters -> overloaded form (union of tuples).
+ * 2. If the function has parameters -> simple form.
+ * 3. else -> `never`.
+ */
+type FunctionParametersInternal<F> = F extends {
+  (...args: infer P1): any;
+  (...args: infer P2): any;
+  (...args: infer P3): any;
+  (...args: infer P4): any;
+  (...args: infer P5): any;
+  (...args: infer P6): any;
+  (...args: infer P7): any;
+  (...args: infer P8): any;
+  (...args: infer P9): any;
+  (...args: infer P10): any;
+  (...args: infer P11): any;
+  (...args: infer P12): any;
+  (...args: infer P13): any;
+  (...args: infer P14): any;
+  (...args: infer P15): any;
+}
+  ?
+      | WithAsymmetricMatchers<P1>
+      | WithAsymmetricMatchers<P2>
+      | WithAsymmetricMatchers<P3>
+      | WithAsymmetricMatchers<P4>
+      | WithAsymmetricMatchers<P5>
+      | WithAsymmetricMatchers<P6>
+      | WithAsymmetricMatchers<P7>
+      | WithAsymmetricMatchers<P8>
+      | WithAsymmetricMatchers<P9>
+      | WithAsymmetricMatchers<P10>
+      | WithAsymmetricMatchers<P11>
+      | WithAsymmetricMatchers<P12>
+      | WithAsymmetricMatchers<P13>
+      | WithAsymmetricMatchers<P14>
+      | WithAsymmetricMatchers<P15>
+  : F extends (...args: infer P) => any
+    ? WithAsymmetricMatchers<P>
+    : never;
+
+/**
+ * @see FunctionParameters
+ */
+type WithAsymmetricMatchers<P extends Array<any>> =
+  Array<unknown> extends P
+    ? never
+    : {[K in keyof P]: DeepAsymmetricMatcher<P[K]>};
+
+/**
+ * Replaces `T` with `T | AsymmetricMatcher`.
+ *
+ * If `T` is an object or an array, recursively replaces all nested types with the same logic:
+ * ```ts
+ * type DeepAsymmetricMatcher<boolean>; // AsymmetricMatcher | boolean
+ * type DeepAsymmetricMatcher<{ foo: number }>; // AsymmetricMatcher | { foo: AsymmetricMatcher | number }
+ * type DeepAsymmetricMatcher<[string]>; // AsymmetricMatcher | [AsymmetricMatcher | string]
+ * ```
+ */
+type DeepAsymmetricMatcher<T> = T extends object
+  ? AsymmetricMatcher | {[K in keyof T]: DeepAsymmetricMatcher<T[K]>}
+  : AsymmetricMatcher | T;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -12,8 +12,8 @@ import {
   DIFF_DELETE,
   DIFF_EQUAL,
   DIFF_INSERT,
-  Diff,
-  DiffOptions as ImportDiffOptions,
+  type Diff,
+  type DiffOptions as ImportDiffOptions,
   diff as diffDefault,
   diffStringsRaw,
   diffStringsUnified,
@@ -24,7 +24,11 @@ import {
   plugins as prettyFormatPlugins,
 } from 'pretty-format';
 import Replaceable from './Replaceable';
-import deepCyclicCopyReplaceable from './deepCyclicCopyReplaceable';
+import deepCyclicCopyReplaceable, {
+  SERIALIZABLE_PROPERTIES,
+} from './deepCyclicCopyReplaceable';
+
+export {SERIALIZABLE_PROPERTIES};
 
 const {
   AsymmetricMatcher,
@@ -94,7 +98,7 @@ export const stringify = (
   maxDepth = 10,
   maxWidth = 10,
 ): string => {
-  const MAX_LENGTH = 10000;
+  const MAX_LENGTH = 10_000;
   let result;
 
   try {
@@ -124,12 +128,12 @@ export const stringify = (
 };
 
 export const highlightTrailingWhitespace = (text: string): string =>
-  text.replace(/\s+$/gm, chalk.inverse('$&'));
+  text.replaceAll(/\s+$/gm, chalk.inverse('$&'));
 
 // Instead of inverse highlight which now implies a change,
 // replace common spaces with middle dot at the end of any line.
 const replaceTrailingSpaces = (text: string): string =>
-  text.replace(/\s+$/gm, spaces => SPACE_SYMBOL.repeat(spaces.length));
+  text.replaceAll(/\s+$/gm, spaces => SPACE_SYMBOL.repeat(spaces.length));
 
 export const printReceived = (object: unknown): string =>
   RECEIVED_COLOR(replaceTrailingSpaces(stringify(object)));
@@ -155,7 +159,7 @@ export const ensureNoExpected = (
   matcherName: string,
   options?: MatcherHintOptions,
 ): void => {
-  if (typeof expected !== 'undefined') {
+  if (expected !== undefined) {
     // Prepend maybe not only for backward compatibility.
     const matcherString = (options ? '' : '[.not]') + matcherName;
     throw new Error(
@@ -262,11 +266,11 @@ const getCommonAndChangedSubstrings = (
       reduced +
       (diff[0] === DIFF_EQUAL
         ? diff[1]
-        : diff[0] !== op
-        ? ''
-        : hasCommonDiff
-        ? INVERTED_COLOR(diff[1])
-        : diff[1]),
+        : diff[0] === op
+          ? hasCommonDiff
+            ? INVERTED_COLOR(diff[1])
+            : diff[1]
+          : ''),
     '',
   );
 
@@ -285,8 +289,8 @@ const isLineDiffable = (expected: unknown, received: unknown): boolean => {
     return (
       typeof expected === 'string' &&
       typeof received === 'string' &&
-      expected.length !== 0 &&
-      received.length !== 0 &&
+      expected.length > 0 &&
+      received.length > 0 &&
       (MULTILINE_REGEXP.test(expected) || MULTILINE_REGEXP.test(received))
     );
   }
@@ -313,7 +317,7 @@ const isLineDiffable = (expected: unknown, received: unknown): boolean => {
   return true;
 };
 
-const MAX_DIFF_STRING_LENGTH = 20000;
+const MAX_DIFF_STRING_LENGTH = 20_000;
 
 export const printDiffOrStringify = (
   expected: unknown,
@@ -325,8 +329,8 @@ export const printDiffOrStringify = (
   if (
     typeof expected === 'string' &&
     typeof received === 'string' &&
-    expected.length !== 0 &&
-    received.length !== 0 &&
+    expected.length > 0 &&
+    received.length > 0 &&
     expected.length <= MAX_DIFF_STRING_LENGTH &&
     received.length <= MAX_DIFF_STRING_LENGTH &&
     expected !== received
@@ -363,12 +367,7 @@ export const printDiffOrStringify = (
 
   if (isLineDiffable(expected, received)) {
     const {replacedExpected, replacedReceived} =
-      replaceMatchedToAsymmetricMatcher(
-        deepCyclicCopyReplaceable(expected),
-        deepCyclicCopyReplaceable(received),
-        [],
-        [],
-      );
+      replaceMatchedToAsymmetricMatcher(expected, received, [], []);
     const difference = diffDefault(replacedExpected, replacedReceived, {
       aAnnotation: expectedLabel,
       bAnnotation: receivedLabel,
@@ -412,7 +411,21 @@ const shouldPrintDiff = (actual: unknown, expected: unknown) => {
   return true;
 };
 
-function replaceMatchedToAsymmetricMatcher(
+export function replaceMatchedToAsymmetricMatcher(
+  replacedExpected: unknown,
+  replacedReceived: unknown,
+  expectedCycles: Array<unknown>,
+  receivedCycles: Array<unknown>,
+): {replacedExpected: unknown; replacedReceived: unknown} {
+  return _replaceMatchedToAsymmetricMatcher(
+    deepCyclicCopyReplaceable(replacedExpected),
+    deepCyclicCopyReplaceable(replacedReceived),
+    expectedCycles,
+    receivedCycles,
+  );
+}
+
+function _replaceMatchedToAsymmetricMatcher(
   replacedExpected: unknown,
   replacedReceived: unknown,
   expectedCycles: Array<unknown>,
@@ -435,6 +448,7 @@ function replaceMatchedToAsymmetricMatcher(
   const expectedReplaceable = new Replaceable(replacedExpected);
   const receivedReplaceable = new Replaceable(replacedReceived);
 
+  // eslint-disable-next-line unicorn/no-array-for-each
   expectedReplaceable.forEach((expectedValue: unknown, key: unknown) => {
     const receivedValue = receivedReplaceable.get(key);
     if (isAsymmetricMatcher(expectedValue)) {
@@ -446,7 +460,7 @@ function replaceMatchedToAsymmetricMatcher(
         expectedReplaceable.set(key, receivedValue);
       }
     } else if (Replaceable.isReplaceable(expectedValue, receivedValue)) {
-      const replaced = replaceMatchedToAsymmetricMatcher(
+      const replaced = _replaceMatchedToAsymmetricMatcher(
         expectedValue,
         receivedValue,
         expectedCycles,
@@ -490,7 +504,7 @@ type PrintLabel = (string: string) => string;
 
 export const getLabelPrinter = (...strings: Array<string>): PrintLabel => {
   const maxLength = strings.reduce(
-    (max, string) => (string.length > max ? string.length : max),
+    (max, string) => Math.max(string.length, max),
     0,
   );
   return (string: string): string =>

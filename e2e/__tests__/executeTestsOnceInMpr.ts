@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -46,7 +46,7 @@ test('Tests are executed only once even in an MPR', () => {
   });
   /* eslint-enable sort-keys */
 
-  const {stderr, exitCode} = runJest(DIR, ['foo/folder/my-test-bar.js']);
+  const {stderr, exitCode} = runJest(DIR, ['my-test-bar.js']);
 
   expect(exitCode).toBe(0);
 

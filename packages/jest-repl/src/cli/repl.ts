@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -10,13 +10,14 @@ declare const jestProjectConfig: Config.ProjectConfig;
 
 import * as path from 'path';
 import * as repl from 'repl';
+import * as util from 'util';
 import {runInThisContext} from 'vm';
 import type {SyncTransformer} from '@jest/transform';
 import type {Config} from '@jest/types';
 import {interopRequireDefault} from 'jest-util';
 
 // TODO: support async as well
-let transformer: SyncTransformer;
+let transformer: SyncTransformer | undefined;
 let transformerConfig: unknown;
 
 const evalCommand: repl.REPLEval = (
@@ -25,12 +26,12 @@ const evalCommand: repl.REPLEval = (
   _filename: string,
   callback: (e: Error | null, result?: unknown) => void,
 ) => {
-  let result;
+  let result: unknown;
   try {
-    if (transformer) {
+    if (transformer != null) {
       const transformResult = transformer.process(
         cmd,
-        jestGlobalConfig.replname || 'jest.js',
+        jestGlobalConfig.replname ?? 'jest.js',
         {
           cacheFS: new Map<string, string>(),
           config: jestProjectConfig,
@@ -48,15 +49,21 @@ const evalCommand: repl.REPLEval = (
           ? transformResult
           : transformResult.code;
     }
-    result = runInThisContext(cmd);
-  } catch (e: any) {
-    return callback(isRecoverableError(e) ? new repl.Recoverable(e) : e);
+    result = runInThisContext(cmd) as unknown;
+  } catch (error: any) {
+    return callback(
+      isRecoverableError(error) ? new repl.Recoverable(error) : error,
+    );
   }
   return callback(null, result);
 };
 
-const isRecoverableError = (error: Error) => {
-  if (error && error.name === 'SyntaxError') {
+const isRecoverableError = (error: unknown) => {
+  if (!util.types.isNativeError(error)) {
+    return false;
+  }
+
+  if (error.name === 'SyntaxError') {
     return [
       'Unterminated template',
       'Missing } in template expression',
@@ -70,14 +77,14 @@ const isRecoverableError = (error: Error) => {
 
 if (jestProjectConfig.transform) {
   let transformerPath = null;
-  for (let i = 0; i < jestProjectConfig.transform.length; i++) {
-    if (new RegExp(jestProjectConfig.transform[i][0]).test('foobar.js')) {
-      transformerPath = jestProjectConfig.transform[i][1];
-      transformerConfig = jestProjectConfig.transform[i][2];
+  for (const transform of jestProjectConfig.transform) {
+    if (new RegExp(transform[0]).test('foobar.js')) {
+      transformerPath = transform[1];
+      transformerConfig = transform[2];
       break;
     }
   }
-  if (transformerPath) {
+  if (transformerPath != null) {
     const transformerOrFactory = interopRequireDefault(
       require(transformerPath),
     ).default;
@@ -88,7 +95,7 @@ if (jestProjectConfig.transform) {
       transformer = transformerOrFactory;
     }
 
-    if (typeof transformer.process !== 'function') {
+    if (typeof transformer?.process !== 'function') {
       throw new TypeError(
         'Jest: a transformer must export a `process` function.',
       );
@@ -103,8 +110,8 @@ const replInstance: repl.REPLServer = repl.start({
 });
 
 replInstance.context.require = (moduleName: string) => {
-  if (/(\/|\\|\.)/.test(moduleName)) {
+  if (/([./\\])/.test(moduleName)) {
     moduleName = path.resolve(process.cwd(), moduleName);
   }
-  return require(moduleName);
+  return require(moduleName) as unknown;
 };

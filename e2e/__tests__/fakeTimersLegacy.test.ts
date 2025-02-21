@@ -1,10 +1,11 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
+import {isJestJasmineRun} from '@jest/test-utils';
 import runJest from '../runJest';
 
 describe('enableGlobally', () => {
@@ -38,11 +39,23 @@ describe('requestAnimationFrame', () => {
 });
 
 describe('setImmediate', () => {
-  test('fakes setImmediate', () => {
+  test('fakes setImmediate w/o `waitNextEventLoopTurnForUnhandledRejectionEvents`', () => {
     const result = runJest('fake-timers-legacy/set-immediate');
 
     expect(result.stderr).toMatch('setImmediate test');
     expect(result.exitCode).toBe(0);
+  });
+
+  test('fakes setImmediate w/ `waitNextEventLoopTurnForUnhandledRejectionEvents`', () => {
+    // Jasmine runner does not handle unhandled promise rejections that are causing the test to fail in Jest circus
+    const expectedExitCode = isJestJasmineRun() ? 0 : 1;
+
+    const result = runJest('fake-timers-legacy/set-immediate', [
+      '--waitNextEventLoopTurnForUnhandledRejectionEvents',
+    ]);
+
+    expect(result.stderr).toMatch('setImmediate test');
+    expect(result.exitCode).toBe(expectedExitCode);
   });
 });
 

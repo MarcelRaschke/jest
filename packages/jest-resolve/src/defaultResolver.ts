@@ -1,17 +1,18 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import {dirname, isAbsolute, resolve as pathResolve} from 'path';
+import {fileURLToPath} from 'url';
 import pnpResolver from 'jest-pnp-resolver';
-import {SyncOpts as UpstreamResolveOptions, sync as resolveSync} from 'resolve';
 import {
-  Options as ResolveExportsOptions,
-  resolve as resolveExports,
-} from 'resolve.exports';
+  type SyncOpts as UpstreamResolveOptions,
+  sync as resolveSync,
+} from 'resolve';
+import * as resolve from 'resolve.exports';
 import {
   findClosestPackageJson,
   isDirectory,
@@ -83,7 +84,7 @@ export type ResolverOptions = {
 };
 
 type UpstreamResolveOptionsWithConditions = UpstreamResolveOptions &
-  Pick<ResolverOptions, 'basedir' | 'conditions'>;
+  ResolverOptions;
 
 export type SyncResolver = (path: string, options: ResolverOptions) => string;
 export type AsyncResolver = (
@@ -111,15 +112,11 @@ const defaultResolver: SyncResolver = (path, options) => {
 
   const pathToResolve = getPathInModule(path, resolveOptions);
 
-  const result =
-    // if `getPathInModule` doesn't change the path, attempt to resolve it
-    pathToResolve === path
-      ? resolveSync(pathToResolve, resolveOptions)
-      : pathToResolve;
-
-  // Dereference symlinks to ensure we don't create a separate
+  // resolveSync dereferences symlinks to ensure we don't create a separate
   // module instance depending on how it was referenced.
-  return realpathSync(result);
+  const result = resolveSync(pathToResolve, resolveOptions);
+
+  return result;
 };
 
 export default defaultResolver;
@@ -136,8 +133,45 @@ function getPathInModule(
   path: string,
   options: UpstreamResolveOptionsWithConditions,
 ): string {
+  if (path.startsWith('file://')) {
+    path = fileURLToPath(path);
+  }
+
   if (shouldIgnoreRequestForExports(path)) {
     return path;
+  }
+
+  if (path.startsWith('#')) {
+    const closestPackageJson = findClosestPackageJson(options.basedir);
+
+    if (!closestPackageJson) {
+      throw new Error(
+        `Jest: unable to locate closest package.json from ${options.basedir} when resolving import "${path}"`,
+      );
+    }
+
+    const pkg = readPackageCached(closestPackageJson);
+
+    const resolved = resolve.imports(
+      pkg,
+      path as resolve.Imports.Entry,
+      createResolveOptions(options.conditions),
+    );
+
+    if (resolved) {
+      const target = resolved[0];
+      return target.startsWith('.')
+        ? // internal relative filepath
+          pathResolve(dirname(closestPackageJson), target)
+        : // this is an external module, re-resolve it
+          defaultResolver(target, options);
+    }
+
+    if (pkg.imports) {
+      throw new Error(
+        '`imports` exists, but no results - this is a bug in Jest. Please report an issue',
+      );
+    }
   }
 
   const segments = path.split('/');
@@ -145,7 +179,6 @@ function getPathInModule(
   let moduleName = segments.shift();
 
   if (moduleName) {
-    // TODO: handle `#` here: https://github.com/facebook/jest/issues/12270
     if (moduleName.startsWith('@')) {
       moduleName = `${moduleName}/${segments.shift()}`;
     }
@@ -155,22 +188,22 @@ function getPathInModule(
     if (closestPackageJson) {
       const pkg = readPackageCached(closestPackageJson);
 
-      if (pkg.name === moduleName && pkg.exports) {
-        const subpath = segments.join('/') || '.';
-
-        const resolved = resolveExports(
+      if (pkg.name === moduleName) {
+        const resolved = resolve.exports(
           pkg,
-          subpath,
+          (segments.join('/') || '.') as resolve.Exports.Entry,
           createResolveOptions(options.conditions),
         );
 
-        if (!resolved) {
+        if (resolved) {
+          return pathResolve(dirname(closestPackageJson), resolved[0]);
+        }
+
+        if (pkg.exports) {
           throw new Error(
             '`exports` exists, but no results - this is a bug in Jest. Please report an issue',
           );
         }
-
-        return pathResolve(dirname(closestPackageJson), resolved);
       }
     }
 
@@ -185,22 +218,20 @@ function getPathInModule(
     if (packageJsonPath && isFile(packageJsonPath)) {
       const pkg = readPackageCached(packageJsonPath);
 
+      const resolved = resolve.exports(
+        pkg,
+        (segments.join('/') || '.') as resolve.Exports.Entry,
+        createResolveOptions(options.conditions),
+      );
+
+      if (resolved) {
+        return pathResolve(dirname(packageJsonPath), resolved[0]);
+      }
+
       if (pkg.exports) {
-        const subpath = segments.join('/') || '.';
-
-        const resolved = resolveExports(
-          pkg,
-          subpath,
-          createResolveOptions(options.conditions),
+        throw new Error(
+          '`exports` exists, but no results - this is a bug in Jest. Please report an issue',
         );
-
-        if (!resolved) {
-          throw new Error(
-            '`exports` exists, but no results - this is a bug in Jest. Please report an issue',
-          );
-        }
-
-        return pathResolve(dirname(packageJsonPath), resolved);
       }
     }
   }
@@ -210,13 +241,13 @@ function getPathInModule(
 
 function createResolveOptions(
   conditions: Array<string> | undefined,
-): ResolveExportsOptions {
+): resolve.Options {
   return conditions
     ? {conditions, unsafe: true}
     : // no conditions were passed - let's assume this is Jest internal and it should be `require`
       {browser: false, require: true};
 }
 
-// if it's a relative import or an absolute path, exports are ignored
+// if it's a relative import or an absolute path, imports/exports are ignored
 const shouldIgnoreRequestForExports = (path: string) =>
   path.startsWith('.') || isAbsolute(path);

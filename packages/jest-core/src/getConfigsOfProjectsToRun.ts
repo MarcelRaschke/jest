@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -22,13 +22,13 @@ export default function getConfigsOfProjectsToRun(
   });
 }
 
+const always = () => true;
+
 function createProjectFilter(opts: {
   ignoreProjects: Array<string> | undefined;
   selectProjects: Array<string> | undefined;
 }) {
   const {selectProjects, ignoreProjects} = opts;
-
-  const always = () => true;
 
   const selected = selectProjects
     ? (name: string | undefined) => name && selectProjects.includes(name)

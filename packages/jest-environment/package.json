@@ -1,9 +1,9 @@
 {
   "name": "@jest/environment",
-  "version": "28.1.1",
+  "version": "30.0.0-alpha.7",
   "repository": {
     "type": "git",
-    "url": "https://github.com/facebook/jest.git",
+    "url": "https://github.com/jestjs/jest.git",
     "directory": "packages/jest-environment"
   },
   "license": "MIT",
@@ -17,13 +17,13 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@jest/fake-timers": "^28.1.1",
-    "@jest/types": "^28.1.1",
+    "@jest/fake-timers": "workspace:*",
+    "@jest/types": "workspace:*",
     "@types/node": "*",
-    "jest-mock": "^28.1.1"
+    "jest-mock": "workspace:*"
   },
   "engines": {
-    "node": "^12.13.0 || ^14.15.0 || ^16.10.0 || >=17.0.0"
+    "node": "^16.10.0 || ^18.12.0 || >=20.0.0"
   },
   "publishConfig": {
     "access": "public"

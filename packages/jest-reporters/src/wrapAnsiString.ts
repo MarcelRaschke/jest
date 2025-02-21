@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -16,23 +16,23 @@ export default function wrapAnsiString(
     return string;
   }
 
-  const ANSI_REGEXP = /[\u001b\u009b]\[\d{1,2}m/gu;
+  const ANSI_REGEXP = /[\u001B\u009B]\[\d{1,2}m/gu;
   const tokens = [];
   let lastIndex = 0;
   let match;
 
   while ((match = ANSI_REGEXP.exec(string))) {
     const ansi = match[0];
-    const index = match['index'];
-    if (index != lastIndex) {
+    const index = match.index;
+    if (index !== lastIndex) {
       tokens.push(['string', string.slice(lastIndex, index)]);
     }
     tokens.push(['ansi', ansi]);
     lastIndex = index + ansi.length;
   }
 
-  if (lastIndex != string.length - 1) {
-    tokens.push(['string', string.slice(lastIndex, string.length)]);
+  if (lastIndex !== string.length - 1) {
+    tokens.push(['string', string.slice(lastIndex)]);
   }
 
   let lastLineLength = 0;
@@ -42,16 +42,13 @@ export default function wrapAnsiString(
       (lines, [kind, token]) => {
         if (kind === 'string') {
           if (lastLineLength + token.length > terminalWidth) {
-            while (token.length) {
+            while (token.length > 0) {
               const chunk = token.slice(0, terminalWidth - lastLineLength);
-              const remaining = token.slice(
-                terminalWidth - lastLineLength,
-                token.length,
-              );
+              const remaining = token.slice(terminalWidth - lastLineLength);
               lines[lines.length - 1] += chunk;
               lastLineLength += chunk.length;
               token = remaining;
-              if (token.length) {
+              if (token.length > 0) {
                 lines.push('');
                 lastLineLength = 0;
               }

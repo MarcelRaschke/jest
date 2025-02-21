@@ -1,11 +1,16 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import {DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT, Diff} from './cleanupSemantic';
+import {
+  DIFF_DELETE,
+  DIFF_EQUAL,
+  DIFF_INSERT,
+  type Diff,
+} from './cleanupSemantic';
 import type {DiffOptionsColor, DiffOptionsNormalized} from './types';
 
 const formatTrailingSpaces = (
@@ -21,15 +26,15 @@ const printDiffLine = (
   trailingSpaceFormatter: DiffOptionsColor,
   emptyFirstOrLastLinePlaceholder: string,
 ): string =>
-  line.length !== 0
-    ? color(
+  line.length === 0
+    ? indicator === ' '
+      ? isFirstOrLast && emptyFirstOrLastLinePlaceholder.length > 0
+        ? color(`${indicator} ${emptyFirstOrLastLinePlaceholder}`)
+        : ''
+      : color(indicator)
+    : color(
         `${indicator} ${formatTrailingSpaces(line, trailingSpaceFormatter)}`,
-      )
-    : indicator !== ' '
-    ? color(indicator)
-    : isFirstOrLast && emptyFirstOrLastLinePlaceholder.length !== 0
-    ? color(`${indicator} ${emptyFirstOrLastLinePlaceholder}`)
-    : '';
+      );
 
 const printDeleteLine = (
   line: string,

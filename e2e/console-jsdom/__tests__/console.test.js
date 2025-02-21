@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -30,11 +30,11 @@ test('can mock console.error calls from jsdom', () => {
 
   function onError(event) {}
 
-  window.addEventListener('error', onError);
+  globalThis.addEventListener('error', onError);
   fakeNode.addEventListener(evtType, callCallback, false);
   evt.initEvent(evtType, false, false);
   fakeNode.dispatchEvent(evt);
-  window.removeEventListener('error', onError);
+  globalThis.removeEventListener('error', onError);
 
   expect(console.error).toHaveBeenCalledTimes(1);
   expect(console.error).toHaveBeenCalledWith(

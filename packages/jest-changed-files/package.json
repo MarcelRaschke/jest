@@ -1,9 +1,9 @@
 {
   "name": "jest-changed-files",
-  "version": "28.0.2",
+  "version": "30.0.0-alpha.7",
   "repository": {
     "type": "git",
-    "url": "https://github.com/facebook/jest.git",
+    "url": "https://github.com/jestjs/jest.git",
     "directory": "packages/jest-changed-files"
   },
   "license": "MIT",
@@ -12,16 +12,19 @@
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
+      "require": "./build/index.js",
+      "import": "./build/index.mjs",
       "default": "./build/index.js"
     },
     "./package.json": "./package.json"
   },
   "dependencies": {
     "execa": "^5.0.0",
-    "throat": "^6.0.1"
+    "jest-util": "workspace:*",
+    "p-limit": "^3.1.0"
   },
   "engines": {
-    "node": "^12.13.0 || ^14.15.0 || ^16.10.0 || >=17.0.0"
+    "node": "^16.10.0 || ^18.12.0 || >=20.0.0"
   },
   "publishConfig": {
     "access": "public"

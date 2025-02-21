@@ -1,23 +1,29 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import * as path from 'path';
+import {isNativeError} from 'util/types';
 import * as fs from 'graceful-fs';
 import parseJson = require('parse-json');
 import stripJsonComments = require('strip-json-comments');
-import type {Service} from 'ts-node';
 import type {Config} from '@jest/types';
+import {extract, parse} from 'jest-docblock';
 import {interopRequireDefault, requireOrImportModule} from 'jest-util';
 import {
+  JEST_CONFIG_EXT_CTS,
   JEST_CONFIG_EXT_JSON,
   JEST_CONFIG_EXT_TS,
   PACKAGE_JSON,
 } from './constants';
 
+interface TsLoader {
+  enabled: (bool: boolean) => void;
+}
+type TsLoaderModule = 'ts-node' | 'esbuild-register';
 // Read the configuration and set its `rootDir`
 // 1. If it's a `package.json` file, we look into its "jest" property
 // 2. If it's a `jest.config.ts` file, we use `ts-node` to transpile & require it
@@ -26,12 +32,18 @@ import {
 export default async function readConfigFileAndSetRootDir(
   configPath: string,
 ): Promise<Config.InitialOptions> {
-  const isTS = configPath.endsWith(JEST_CONFIG_EXT_TS);
+  const isTS =
+    configPath.endsWith(JEST_CONFIG_EXT_TS) ||
+    configPath.endsWith(JEST_CONFIG_EXT_CTS);
   const isJSON = configPath.endsWith(JEST_CONFIG_EXT_JSON);
+  // type assertion can be removed once @types/node is updated
+  // https://nodejs.org/api/process.html#processfeaturestypescript
+  const supportsTS = (process.features as {typescript?: boolean | string})
+    .typescript;
   let configObject;
 
   try {
-    if (isTS) {
+    if (isTS && !supportsTS) {
       configObject = await loadTSConfigFile(configPath);
     } else if (isJSON) {
       const fileContent = fs.readFileSync(configPath, 'utf8');
@@ -64,29 +76,48 @@ export default async function readConfigFileAndSetRootDir(
     // We don't touch it if it has an absolute path specified
     if (!path.isAbsolute(configObject.rootDir)) {
       // otherwise, we'll resolve it relative to the file's __dirname
-      configObject.rootDir = path.resolve(
-        path.dirname(configPath),
-        configObject.rootDir,
-      );
+      configObject = {
+        ...configObject,
+        rootDir: path.resolve(path.dirname(configPath), configObject.rootDir),
+      };
     }
   } else {
     // If rootDir is not there, we'll set it to this file's __dirname
-    configObject.rootDir = path.dirname(configPath);
+    configObject = {
+      ...configObject,
+      rootDir: path.dirname(configPath),
+    };
   }
 
   return configObject;
 }
 
-let registerer: Service;
-
 // Load the TypeScript configuration
+let extraTSLoaderOptions: Record<string, unknown>;
+
 const loadTSConfigFile = async (
   configPath: string,
 ): Promise<Config.InitialOptions> => {
-  // Register TypeScript compiler instance
-  await registerTsNode();
+  // Get registered TypeScript compiler instance
+  const docblockPragmas = parse(extract(fs.readFileSync(configPath, 'utf8')));
+  const tsLoader = docblockPragmas['jest-config-loader'] || 'ts-node';
+  const docblockTSLoaderOptions = docblockPragmas['jest-config-loader-options'];
 
-  registerer.enabled(true);
+  if (typeof docblockTSLoaderOptions === 'string') {
+    extraTSLoaderOptions = JSON.parse(docblockTSLoaderOptions);
+  }
+  if (Array.isArray(tsLoader)) {
+    throw new TypeError(
+      `Jest: You can only define a single loader through docblocks, got "${tsLoader.join(
+        ', ',
+      )}"`,
+    );
+  }
+
+  const registeredCompiler = await getRegisteredCompiler(
+    tsLoader as TsLoaderModule,
+  );
+  registeredCompiler.enabled(true);
 
   let configObject = interopRequireDefault(require(configPath)).default;
 
@@ -95,34 +126,69 @@ const loadTSConfigFile = async (
     configObject = await configObject();
   }
 
-  registerer.enabled(false);
+  registeredCompiler.enabled(false);
 
   return configObject;
 };
 
-async function registerTsNode(): Promise<Service> {
-  if (registerer) {
-    return registerer;
-  }
+let registeredCompilerPromise: Promise<TsLoader>;
 
+function getRegisteredCompiler(loader: TsLoaderModule) {
+  // Cache the promise to avoid multiple registrations
+  registeredCompilerPromise =
+    registeredCompilerPromise ?? registerTsLoader(loader);
+  return registeredCompilerPromise;
+}
+
+async function registerTsLoader(loader: TsLoaderModule): Promise<TsLoader> {
   try {
-    const tsNode = await import('ts-node');
-    registerer = tsNode.register({
-      compilerOptions: {
-        module: 'CommonJS',
-      },
-      moduleTypes: {
-        '**': 'cjs',
-      },
-    });
-    return registerer;
-  } catch (e: any) {
-    if (e.code === 'ERR_MODULE_NOT_FOUND') {
+    // Register TypeScript compiler instance
+    if (loader === 'ts-node') {
+      const tsLoader = await import(/* webpackIgnore: true */ 'ts-node');
+
+      return tsLoader.register({
+        compilerOptions: {
+          module: 'CommonJS',
+        },
+        moduleTypes: {
+          '**': 'cjs',
+        },
+        ...extraTSLoaderOptions,
+      });
+    } else if (loader === 'esbuild-register') {
+      const tsLoader = await import(
+        /* webpackIgnore: true */ 'esbuild-register/dist/node'
+      );
+
+      let instance: {unregister: () => void} | undefined;
+
+      return {
+        enabled: (bool: boolean) => {
+          if (bool) {
+            instance = tsLoader.register({
+              target: `node${process.version.slice(1)}`,
+              ...extraTSLoaderOptions,
+            });
+          } else {
+            instance?.unregister();
+          }
+        },
+      };
+    }
+
+    throw new Error(
+      `Jest: '${loader}' is not a valid TypeScript configuration loader.`,
+    );
+  } catch (error) {
+    if (
+      isNativeError(error) &&
+      (error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND'
+    ) {
       throw new Error(
-        `Jest: 'ts-node' is required for the TypeScript configuration files. Make sure it is installed\nError: ${e.message}`,
+        `Jest: '${loader}' is required for the TypeScript configuration files. Make sure it is installed\nError: ${error.message}`,
       );
     }
 
-    throw e;
+    throw error;
   }
 }

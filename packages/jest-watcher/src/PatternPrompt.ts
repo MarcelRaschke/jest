@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -41,7 +41,7 @@ export default abstract class PatternPrompt {
     this._pipe.write(ansiEscapes.cursorHide);
     this._pipe.write(CLEAR);
 
-    if (options && options.header) {
+    if (typeof options?.header === 'string' && options.header) {
       this._pipe.write(`${options.header}\n`);
       this._currentUsageRows = usageRows + options.header.split('\n').length;
     } else {

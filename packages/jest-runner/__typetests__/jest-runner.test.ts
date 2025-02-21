@@ -1,25 +1,26 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
-import {expectType} from 'tsd-lite';
-import {CallbackTestRunner, EmittingTestRunner} from 'jest-runner';
-import type {
-  CallbackTestRunnerInterface,
-  Config,
-  EmittingTestRunnerInterface,
-  OnTestFailure,
-  OnTestStart,
-  OnTestSuccess,
-  Test,
-  TestEvents,
-  TestRunnerContext,
-  TestRunnerOptions,
-  TestWatcher,
-  UnsubscribeFn,
+import {expect} from 'tstyche';
+import {
+  CallbackTestRunner,
+  type CallbackTestRunnerInterface,
+  type Config,
+  EmittingTestRunner,
+  type EmittingTestRunnerInterface,
+  type OnTestFailure,
+  type OnTestStart,
+  type OnTestSuccess,
+  type Test,
+  type TestEvents,
+  type TestRunnerContext,
+  type TestRunnerOptions,
+  type TestWatcher,
+  type UnsubscribeFn,
 } from 'jest-runner';
 
 const globalConfig = {} as Config.GlobalConfig;
@@ -36,8 +37,8 @@ class CallbackRunner extends CallbackTestRunner {
     onFailure: OnTestFailure,
     options: TestRunnerOptions,
   ): Promise<void> {
-    expectType<Config.GlobalConfig>(this._globalConfig);
-    expectType<TestRunnerContext>(this._context);
+    expect(this._globalConfig).type.toBe<Config.GlobalConfig>();
+    expect(this._context).type.toBe<TestRunnerContext>();
 
     return;
   }
@@ -45,8 +46,8 @@ class CallbackRunner extends CallbackTestRunner {
 
 const callbackRunner = new CallbackRunner(globalConfig, runnerContext);
 
-expectType<boolean | undefined>(callbackRunner.isSerial);
-expectType<false>(callbackRunner.supportsEventEmitters);
+expect(callbackRunner.isSerial).type.toBe<boolean | undefined>();
+expect(callbackRunner.supportsEventEmitters).type.toBe<false>();
 
 // CallbackTestRunnerInterface
 
@@ -67,8 +68,8 @@ class CustomCallbackRunner implements CallbackTestRunnerInterface {
     onFailure: OnTestFailure,
     options: TestRunnerOptions,
   ): Promise<void> {
-    expectType<Config.GlobalConfig>(this.#globalConfig);
-    expectType<number>(this.#maxConcurrency);
+    expect(this.#globalConfig).type.toBe<Config.GlobalConfig>();
+    expect(this.#maxConcurrency).type.toBeNumber();
 
     return;
   }
@@ -82,8 +83,8 @@ class EmittingRunner extends EmittingTestRunner {
     watcher: TestWatcher,
     options: TestRunnerOptions,
   ): Promise<void> {
-    expectType<Config.GlobalConfig>(this._globalConfig);
-    expectType<TestRunnerContext>(this._context);
+    expect(this._globalConfig).type.toBe<Config.GlobalConfig>();
+    expect(this._context).type.toBe<TestRunnerContext>();
 
     return;
   }
@@ -98,8 +99,8 @@ class EmittingRunner extends EmittingTestRunner {
 
 const emittingRunner = new EmittingRunner(globalConfig, runnerContext);
 
-expectType<boolean | undefined>(emittingRunner.isSerial);
-expectType<true>(emittingRunner.supportsEventEmitters);
+expect(emittingRunner.isSerial).type.toBe<boolean | undefined>();
+expect(emittingRunner.supportsEventEmitters).type.toBe<true>();
 
 // EmittingTestRunnerInterface
 
@@ -118,8 +119,8 @@ class CustomEmittingRunner implements EmittingTestRunnerInterface {
     watcher: TestWatcher,
     options: TestRunnerOptions,
   ): Promise<void> {
-    expectType<Config.GlobalConfig>(this.#globalConfig);
-    expectType<number>(this.#maxConcurrency);
+    expect(this.#globalConfig).type.toBe<Config.GlobalConfig>();
+    expect(this.#maxConcurrency).type.toBeNumber();
 
     return;
   }

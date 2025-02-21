@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -10,16 +10,16 @@
 'use strict';
 
 const mockPerformanceMark = jest.fn();
-window.performance.mark = mockPerformanceMark;
+globalThis.performance.mark = mockPerformanceMark;
 
 test('fakes all APIs', () => {
   jest.useFakeTimers();
 
-  expect(window.performance.mark).toBeUndefined();
+  expect(globalThis.performance.mark).not.toBe(mockPerformanceMark);
 });
 
 test('does not fake `performance` instance', () => {
   jest.useFakeTimers({doNotFake: ['performance']});
 
-  expect(window.performance.mark).toBe(mockPerformanceMark);
+  expect(globalThis.performance.mark).toBe(mockPerformanceMark);
 });

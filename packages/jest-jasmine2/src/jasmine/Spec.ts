@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,7 @@
  */
 // This file is a heavily modified fork of Jasmine. Original license:
 /*
-Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+Copyright (c) 2008-2016 Pivotal Labs
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -28,16 +28,16 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-/* eslint-disable sort-keys, local/prefer-spread-eventually, local/prefer-rest-params-eventually, @typescript-eslint/no-empty-function */
+/* eslint-disable sort-keys, @typescript-eslint/no-empty-function */
 
 import {AssertionError} from 'assert';
-import type {FailedAssertion, Milliseconds, Status} from '@jest/test-result';
+import type {FailedAssertion, Status} from '@jest/test-result';
 import type {Circus} from '@jest/types';
 import {convertDescriptorToString} from 'jest-util';
 import ExpectationFailed from '../ExpectationFailed';
 import assertionErrorMessage from '../assertionErrorMessage';
 import expectationResultFactory, {
-  Options as ExpectationResultFactoryOptions,
+  type Options as ExpectationResultFactoryOptions,
 } from '../expectationResultFactory';
 import type {QueueableFn, default as queueRunner} from '../queueRunner';
 import type {AssertionErrorWithStack} from '../types';
@@ -63,7 +63,7 @@ export type SpecResult = {
   id: string;
   description: string;
   fullName: string;
-  duration?: Milliseconds;
+  duration?: number;
   failedExpectations: Array<FailedAssertion>;
   testPath: string;
   passedExpectations: Array<ReturnType<typeof expectationResultFactory>>;
@@ -103,7 +103,7 @@ export default class Spec {
     return !!(
       e &&
       e.toString &&
-      e.toString().indexOf(Spec.pendingSpecExceptionMessage) !== -1
+      e.toString().includes(Spec.pendingSpecExceptionMessage)
     );
   }
 
@@ -131,6 +131,7 @@ export default class Spec {
     this.queueRunnerFactory = attrs.queueRunnerFactory || function () {};
     this.throwOnExpectationFailure = !!attrs.throwOnExpectationFailure;
 
+    // eslint-disable-next-line unicorn/error-message
     this.initError = new Error();
     this.initError.name = '';
 
@@ -312,5 +313,5 @@ const extractCustomPendingMessage = function (e: Error) {
   const boilerplateEnd =
     boilerplateStart + Spec.pendingSpecExceptionMessage.length;
 
-  return fullMessage.substr(boilerplateEnd);
+  return fullMessage.slice(boilerplateEnd);
 };

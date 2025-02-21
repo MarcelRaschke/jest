@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -56,7 +56,7 @@ describe('Runtime', () => {
   });
 
   it('does not find modules if NODE_PATH is relative', async () => {
-    const nodePath = `${cwd.substr(
+    const nodePath = `${cwd.slice(
       path.sep.length,
     )}src/Runtime/__tests__/NODE_PATH_dir`;
     const runtime = await createLocalRuntime(nodePath);

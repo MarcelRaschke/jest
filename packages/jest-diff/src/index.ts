@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -8,10 +8,10 @@
 import chalk = require('chalk');
 import {getType} from 'jest-get-type';
 import {
+  type PrettyFormatOptions,
   format as prettyFormat,
   plugins as prettyFormatPlugins,
 } from 'pretty-format';
-import type {PrettyFormatOptions} from 'pretty-format';
 import {DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT, Diff} from './cleanupSemantic';
 import {NO_DIFF_MESSAGE, SIMILAR_MESSAGE} from './constants';
 import {diffLinesRaw, diffLinesUnified, diffLinesUnified2} from './diffLines';
@@ -122,11 +122,11 @@ function comparePrimitive(
 }
 
 function sortMap(map: Map<unknown, unknown>) {
-  return new Map(Array.from(map.entries()).sort());
+  return new Map([...map].sort());
 }
 
 function sortSet(set: Set<unknown>) {
-  return new Set(Array.from(set.values()).sort());
+  return new Set([...set].sort());
 }
 
 function compareObjects(

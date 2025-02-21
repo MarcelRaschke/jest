@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -19,9 +19,7 @@ export const errorMessage = (
   path?: Array<string>,
 ): void => {
   const conditions = getValues(defaultValue);
-  const validTypes: Array<string> = Array.from(
-    new Set(conditions.map(getType)),
-  );
+  const validTypes: Array<string> = [...new Set(conditions.map(getType))];
 
   const message = `  Option ${chalk.bold(
     `"${path && path.length > 0 ? `${path.join('.')}.` : ''}${option}"`,

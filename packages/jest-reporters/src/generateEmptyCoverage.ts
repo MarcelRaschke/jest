@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,7 +7,7 @@
 
 import type {V8Coverage} from 'collect-v8-coverage';
 import * as fs from 'graceful-fs';
-import {FileCoverage, createFileCoverage} from 'istanbul-lib-coverage';
+import {type FileCoverage, createFileCoverage} from 'istanbul-lib-coverage';
 import {readInitialCoverage} from 'istanbul-lib-instrument';
 import {createScriptTransformer, shouldInstrument} from '@jest/transform';
 import type {Config} from '@jest/types';
@@ -36,7 +36,6 @@ export default async function generateEmptyCoverage(
     changedFiles,
     collectCoverage: globalConfig.collectCoverage,
     collectCoverageFrom: globalConfig.collectCoverageFrom,
-    collectCoverageOnlyFrom: globalConfig.collectCoverageOnlyFrom,
     coverageProvider: globalConfig.coverageProvider,
     sourcesRelatedToTestsInChangedFiles,
   };

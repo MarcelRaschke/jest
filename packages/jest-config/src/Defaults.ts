@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -51,6 +51,8 @@ const defaultOptions: Config.DefaultOptions = {
     'cjs',
     'jsx',
     'ts',
+    'mts',
+    'cts',
     'tsx',
     'json',
     'node',
@@ -60,6 +62,7 @@ const defaultOptions: Config.DefaultOptions = {
   noStackTrace: false,
   notify: false,
   notifyMode: 'failure-change',
+  openHandlesTimeout: 1000,
   passWithNoTests: false,
   prettierPath: 'prettier',
   resetMocks: false,
@@ -72,21 +75,27 @@ const defaultOptions: Config.DefaultOptions = {
   setupFilesAfterEnv: [],
   skipFilter: false,
   slowTestThreshold: 5,
+  snapshotFormat: {escapeString: false, printBasicPrototype: false},
   snapshotSerializers: [],
   testEnvironment: 'jest-environment-node',
   testEnvironmentOptions: {},
   testFailureExitCode: 1,
   testLocationInResults: false,
-  testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[tj]s?(x)'],
+  testMatch: [
+    '**/__tests__/**/*.?([mc])[jt]s?(x)',
+    '**/?(*.)+(spec|test).?([mc])[jt]s?(x)',
+  ],
   testPathIgnorePatterns: [NODE_MODULES_REGEXP],
   testRegex: [],
   testRunner: 'jest-circus/runner',
   testSequencer: '@jest/test-sequencer',
   transformIgnorePatterns: [NODE_MODULES_REGEXP, `\\.pnp\\.[^\\${sep}]+$`],
   useStderr: false,
+  waitNextEventLoopTurnForUnhandledRejectionEvents: false,
   watch: false,
   watchPathIgnorePatterns: [],
   watchman: true,
+  workerThreads: false,
 };
 
 export default defaultOptions;

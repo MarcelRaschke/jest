@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -28,7 +28,7 @@ test('shows the correct errors in stderr when failing tests', () => {
   expect(result.exitCode).toBe(1);
   const output = extractSummary(result.stderr)
     .rest.split('\n')
-    .map(line => line.trimRight())
+    .map(line => line.trimEnd())
     .join('\n');
   expect(output).toMatchSnapshot();
 });
@@ -56,6 +56,13 @@ test('runs only the describe.only.each tests', () => {
 
 test('formats args with pretty format when given %p', () => {
   const result = runJest(dir, ['pretty.test.js']);
+  const {rest} = extractSummary(result.stderr);
+  expect(rest).toMatchSnapshot();
+  expect(result.exitCode).toBe(0);
+});
+
+test('allows nullable or undefined args when templating object each args', () => {
+  const result = runJest(dir, ['eachTemplate.test.js']);
   const {rest} = extractSummary(result.stderr);
   expect(rest).toMatchSnapshot();
   expect(result.exitCode).toBe(0);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -19,7 +19,7 @@ afterEach(() => cleanup(DIR));
 
 test("--listTests doesn't duplicate the test files", () => {
   writeFiles(DIR, {
-    '.watchmanconfig': '',
+    '.watchmanconfig': '{}',
     '/project1.js': "module.exports = {rootDir: './', displayName: 'BACKEND'}",
     '/project2.js': "module.exports = {rootDir: './', displayName: 'BACKEND'}",
     '__tests__/inBothProjectsTest.js': "test('test', () => {});",
@@ -35,7 +35,7 @@ test("--listTests doesn't duplicate the test files", () => {
 
 test('can pass projects or global config', () => {
   writeFiles(DIR, {
-    '.watchmanconfig': '',
+    '.watchmanconfig': '{}',
     'base_config.js': `
       module.exports = {
         haste: {
@@ -132,7 +132,7 @@ test('can pass projects or global config', () => {
 
 test('"No tests found" message for projects', () => {
   writeFiles(DIR, {
-    '.watchmanconfig': '',
+    '.watchmanconfig': '{}',
     'package.json': '{}',
     'project1/__tests__/file1.test.js': `
       const file1 = require('../file1');
@@ -200,8 +200,8 @@ test.each([{projectPath: 'packages/somepackage'}, {projectPath: 'packages/*'}])(
     const {stdout, stderr, exitCode} = runJest(DIR, ['--no-watchman']);
     expect(stderr).toContain('PASS somepackage packages/somepackage/test.js');
     expect(stderr).toContain('Test Suites: 1 passed, 1 total');
-    expect(stdout).toEqual('');
-    expect(exitCode).toEqual(0);
+    expect(stdout).toBe('');
+    expect(exitCode).toBe(0);
   },
 );
 
@@ -250,8 +250,8 @@ test.each([
     const {stdout, stderr, exitCode} = runJest(DIR, ['--no-watchman']);
     expect(stderr).toContain(`PASS ${displayName} ${projectPath}/test.js`);
     expect(stderr).toContain('Test Suites: 1 passed, 1 total');
-    expect(stdout).toEqual('');
-    expect(exitCode).toEqual(0);
+    expect(stdout).toBe('');
+    expect(exitCode).toBe(0);
   },
 );
 
@@ -284,8 +284,8 @@ test('projects can be workspaces with non-JS/JSON files', () => {
   expect(stderr).toContain('PASS packages/project1/__tests__/file1.test.js');
   expect(stderr).toContain('PASS packages/project2/__tests__/file2.test.js');
   expect(stderr).toContain('Ran all test suites in 2 projects.');
-  expect(stdout).toEqual('');
-  expect(exitCode).toEqual(0);
+  expect(stdout).toBe('');
+  expect(exitCode).toBe(0);
 });
 
 test('objects in project configuration', () => {
@@ -310,8 +310,8 @@ test('objects in project configuration', () => {
   expect(stderr).toContain('PASS __tests__/file1.test.js');
   expect(stderr).toContain('PASS __tests__/file2.test.js');
   expect(stderr).toContain('Ran all test suites in 2 projects.');
-  expect(stdout).toEqual('');
-  expect(exitCode).toEqual(0);
+  expect(stdout).toBe('');
+  expect(exitCode).toBe(0);
 });
 
 test('allows a single project', () => {
@@ -330,13 +330,13 @@ test('allows a single project', () => {
   const {stdout, stderr, exitCode} = runJest(DIR, ['--no-watchman']);
   expect(stderr).toContain('PASS __tests__/file1.test.js');
   expect(stderr).toContain('Test Suites: 1 passed, 1 total');
-  expect(stdout).toEqual('');
-  expect(exitCode).toEqual(0);
+  expect(stdout).toBe('');
+  expect(exitCode).toBe(0);
 });
 
 test('resolves projects and their <rootDir> properly', () => {
   writeFiles(DIR, {
-    '.watchmanconfig': '',
+    '.watchmanconfig': '{}',
     'package.json': JSON.stringify({
       jest: {
         projects: [
@@ -436,7 +436,7 @@ test('resolves projects and their <rootDir> properly', () => {
 
 test('Does transform files with the corresponding project transformer', () => {
   writeFiles(DIR, {
-    '.watchmanconfig': '',
+    '.watchmanconfig': '{}',
     'file.js': SAMPLE_FILE_CONTENT,
     'package.json': '{}',
     'project1/__tests__/project1.test.js': `
@@ -487,7 +487,7 @@ test('Does transform files with the corresponding project transformer', () => {
 describe("doesn't bleed module file extensions resolution with multiple workers", () => {
   test('external config files', () => {
     writeFiles(DIR, {
-      '.watchmanconfig': '',
+      '.watchmanconfig': '{}',
       'file.js': 'module.exports = "file1"',
       'file.p2.js': 'module.exports = "file2"',
       'package.json': '{}',
@@ -537,7 +537,7 @@ describe("doesn't bleed module file extensions resolution with multiple workers"
 
   test('inline config files', () => {
     writeFiles(DIR, {
-      '.watchmanconfig': '',
+      '.watchmanconfig': '{}',
       'file.js': 'module.exports = "file1"',
       'file.p2.js': 'module.exports = "file2"',
       'package.json': JSON.stringify({

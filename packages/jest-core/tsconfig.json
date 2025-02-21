@@ -12,6 +12,7 @@
     {"path": "../jest-console"},
     {"path": "../jest-haste-map"},
     {"path": "../jest-message-util"},
+    {"path": "../jest-pattern"},
     {"path": "../jest-regex-util"},
     {"path": "../jest-reporters"},
     {"path": "../jest-resolve"},
@@ -26,7 +27,6 @@
     {"path": "../jest-util"},
     {"path": "../jest-validate"},
     {"path": "../jest-watcher"},
-    {"path": "../pretty-format"},
-    {"path": "../test-utils"}
+    {"path": "../pretty-format"}
   ]
 }

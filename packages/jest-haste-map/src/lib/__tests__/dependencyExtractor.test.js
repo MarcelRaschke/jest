@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -70,7 +70,7 @@ describe('dependencyExtractor', () => {
     );
   });
 
-  // https://github.com/facebook/jest/issues/8547
+  // https://github.com/jestjs/jest/issues/8547
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import#Import_a_module_for_its_side_effects_only
   it('should extract dependencies from side-effect only `import` statements', () => {
     const code = `
@@ -225,28 +225,6 @@ describe('dependencyExtractor', () => {
       xjest.requireMock('inv2');
       jest.requireMockx('inv3');
       jest.requireMock('inv4', 'inv5');
-    `;
-    expect(extractor.extract(code)).toEqual(
-      new Set(['dep1', 'dep2', 'dep3', 'dep4']),
-    );
-  });
-
-  it('should extract dependencies from `jest.genMockFromModule` calls', () => {
-    const code = `
-      // Good
-      jest.genMockFromModule('dep1');
-      const dep2 = jest.genMockFromModule(
-        "dep2",
-      );
-      if (jest.genMockFromModule(\`dep3\`).cond) {}
-      jest
-        .requireMock('dep4');
-
-      // Bad
-      foo . jest.genMockFromModule('inv1')
-      xjest.genMockFromModule('inv2');
-      jest.genMockFromModulex('inv3');
-      jest.genMockFromModule('inv4', 'inv5');
     `;
     expect(extractor.extract(code)).toEqual(
       new Set(['dep1', 'dep2', 'dep3', 'dep4']),
