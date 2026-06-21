@@ -4433,7 +4433,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jest/monorepo@workspace:."
   dependencies:
-    "@babel/core": "npm:^7.27.4"
     "@babel/plugin-transform-modules-commonjs": "npm:^7.27.1"
     "@babel/preset-env": "npm:^7.27.2"
     "@babel/preset-react": "npm:^7.27.1"
@@ -4450,7 +4449,6 @@ __metadata:
     "@lerna-lite/publish": "npm:^4.3.0"
     "@microsoft/api-extractor": "npm:^7.35.0"
     "@tsconfig/node18": "npm:^18.2.4"
-    "@types/babel__core": "npm:^7.20.5"
     "@types/babel__generator": "npm:^7.27.0"
     "@types/babel__template": "npm:^7.4.4"
     "@types/node": "npm:^18.14"
